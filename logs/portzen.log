@@ -1,0 +1,37 @@
+[INFO] Operational log cleared by user 'testadmin'.
+[2026-09-14 20:10:49] [INFO] [portzen] Operational logs cleared by user request.
+[2026-09-14 20:10:49] [INFO] [portzen] Successful login for user 'testadmin' from 127.0.0.1
+[2026-09-14 20:10:49] [INFO] [portzen] System settings reset to defaults.
+[2026-09-14 20:10:50] [INFO] [portzen] Successful login for user 'testadmin' from 127.0.0.1
+[2026-09-14 20:10:50] [INFO] [portzen] Successful login for user 'testadmin' from 127.0.0.1
+[2026-09-14 20:10:50] [INFO] [portzen] Alert #1 acknowledged by user.
+[2026-09-14 20:10:50] [INFO] [portzen] Alert #1 marked as Resolved.
+[2026-09-14 20:10:50] [INFO] [portzen] Alert #1 marked as Ignored.
+[2026-09-14 20:10:50] [INFO] [portzen] Starting local port scan...
+[2026-09-14 20:10:50] [INFO] [portzen] Local port scan completed. Discovered 108 listening endpoints.
+[2026-09-14 20:10:50] [INFO] [portzen] Starting remote port scan for host 127.0.0.1...
+[2026-09-14 20:10:50] [INFO] [portzen] Remote scan for 127.0.0.1 completed. Found 0 open ports.
+[2026-09-17 17:47:06] [INFO] [portzen] Background monitoring scheduler thread started.
+[2026-09-17 17:47:06] [INFO] [portzen] Starting PortZen Web Application on http://127.0.0.1:5100
+[2026-09-17 17:47:29] [INFO] [portzen] Successful login for user 'admin' from 127.0.0.1
+[2026-09-17 17:47:37] [INFO] [portzen] User 'admin' logged out.
+[2026-09-17 18:02:21] [INFO] [portzen] Successful login for user 'admin' from 127.0.0.1
+[2026-09-17 18:03:40] [INFO] [portzen] Successful login for user 'admin' from 127.0.0.1
+[2026-09-17 18:05:58] [INFO] [portzen] Initiating port scan for host 'android' (ID: 3, IP: 10.26.119.170)...
+[2026-09-17 18:05:58] [INFO] [portzen] Starting remote port scan for host 10.26.119.170...
+[2026-09-17 18:05:59] [INFO] [portzen] Remote scan for 10.26.119.170 completed. Found 0 open ports.
+[2026-09-17 18:05:59] [INFO] [portzen] Scan completed for host 'android': 0 open ports, 54 events, 0 new alerts.
+[2026-09-17 18:05:59] [INFO] [portzen] Monitoring enabled for Host ID 3 (Interval: 60s)
+[2026-09-17 18:06:21] [INFO] [portzen] Monitoring disabled for Host ID 3
+[2026-09-17 18:06:35] [INFO] [portzen] Initiating port scan for host 'window' (ID: 2, IP: 10.68.4.38)...
+[2026-09-17 18:06:35] [INFO] [portzen] Starting remote port scan for host 10.68.4.38...
+[2026-09-17 18:06:36] [INFO] [portzen] Remote scan for 10.68.4.38 completed. Found 3 open ports.
+[2026-09-17 18:06:36] [INFO] [portzen] Scan completed for host 'window': 3 open ports, 3 events, 0 new alerts.
+[2026-09-17 18:06:36] [INFO] [portzen] Monitoring enabled for Host ID 2 (Interval: 60s)
+[2026-09-17 18:07:37] [INFO] [portzen] Scheduled periodic scan triggered for host 'window' (ID: 2).
+[2026-09-17 18:07:37] [INFO] [portzen] Initiating port scan for host 'window' (ID: 2, IP: 10.68.4.38)...
+[2026-09-17 18:07:37] [INFO] [portzen] Starting remote port scan for host 10.68.4.38...
+[2026-09-17 18:07:38] [INFO] [portzen] Remote scan for 10.68.4.38 completed. Found 3 open ports.
+[2026-09-17 18:07:38] [INFO] [portzen] Scan completed for host 'window': 3 open ports, 0 events, 0 new alerts.
+[2026-09-17 18:07:41] [INFO] [portzen] Stopping background monitoring scheduler...
+[2026-09-17 18:07:41] [INFO] [portzen] Background monitoring scheduler stopped.

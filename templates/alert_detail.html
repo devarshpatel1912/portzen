@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Investigate Alert #{{ alert.id }} &bull; PortZen{% endblock %}
+
+{% block content %}
+<!-- Back Navigation -->
+<a href="{{ url_for('alerts.index') }}" class="alert-detail-back-link">
+    <i class="bi bi-arrow-left"></i> Back to Alert Queue
+</a>
+
+<!-- Header Card matching enterprise SOC style -->
+<div class="alert-detail-header-card">
+    <div class="alert-detail-title-wrap">
+        <h2 class="alert-detail-title">Alert #{{ alert.id }}</h2>
+        
+        <!-- Risk Badge -->
+        {% if alert.risk == 'HIGH' %}
+        <span class="detail-risk-badge detail-risk-high">
+            <i class="bi bi-exclamation-triangle-fill"></i> High Risk
+        </span>
+        {% elif alert.risk == 'MEDIUM' %}
+        <span class="detail-risk-badge detail-risk-medium">
+            <i class="bi bi-exclamation-triangle-fill"></i> Medium Risk
+        </span>
+        {% else %}
+        <span class="detail-risk-badge detail-risk-low">
+            <i class="bi bi-shield-check"></i> Low Risk
+        </span>
+        {% endif %}
+
+        <!-- Status Badge -->
+        <span class="status-pill-badge {% if alert.status == 'OPEN' %}status-pill-open{% elif alert.status == 'RESOLVED' %}status-pill-resolved{% elif alert.status == 'ACKNOWLEDGED' %}status-pill-ack{% else %}status-pill-ignored{% endif %}">
+            {{ alert.status }}
+        </span>
+    </div>
+
+    <!-- Status Actions -->
+    <div class="alert-detail-actions">
+        <button class="btn-detail-action btn-triage-ack btn-alert-action" data-alert-id="{{ alert.id }}" data-action="acknowledge" title="Acknowledge Alert">
+            <i class="bi bi-check2"></i> Acknowledge
+        </button>
+
+        <button class="btn-detail-action btn-triage-resolve btn-alert-action" data-alert-id="{{ alert.id }}" data-action="resolve" title="Mark as Resolved">
+            <i class="bi bi-check-circle"></i> Mark as Resolved
+        </button>
+
+        <button class="btn-detail-action btn-triage-ignore btn-alert-action" data-alert-id="{{ alert.id }}" data-action="ignore" title="Ignore Alert">
+            <i class="bi bi-slash-circle"></i> Ignore
+        </button>
+    </div>
+</div>
+
+<!-- Quick Context 4-Card Summary Row -->
+<div class="alert-detail-summary-grid">
+    <!-- Card 1: Target Host -->
+    <div class="detail-summary-card">
+        <div class="detail-summary-icon icon-blue">
+            <i class="bi bi-laptop"></i>
+        </div>
+        <div>
+            <div class="detail-summary-title">Target Host</div>
+            <div class="detail-summary-val">{{ alert.host.name }}</div>
+            <div class="detail-summary-sub">{{ alert.host.ip_address }}</div>
+        </div>
+    </div>
+
+    <!-- Card 2: Port & Protocol -->
+    <div class="detail-summary-card">
+        <div class="detail-summary-icon icon-blue">
+            <i class="bi bi-diagram-3"></i>
+        </div>
+        <div>
+            <div class="detail-summary-title">Exposed Port</div>
+            <div class="detail-summary-val">Port {{ alert.port }} / {{ alert.protocol }}</div>
+            <div class="detail-summary-sub">{{ alert.service or 'Unknown Service' }}</div>
+        </div>
+    </div>
+
+    <!-- Card 3: Active Process -->
+    <div class="detail-summary-card">
+        <div class="detail-summary-icon icon-amber">
+            <i class="bi bi-cpu"></i>
+        </div>
+        <div>
+            <div class="detail-summary-title">Active Process</div>
+            <div class="detail-summary-val text-truncate" style="max-width: 180px;" title="{{ alert.process_name or 'Unknown' }}">
+                {{ alert.process_name or 'Unknown Binary' }}
+            </div>
+            <div class="detail-summary-sub">PID: {{ alert.pid or 'N/A' }}</div>
+        </div>
+    </div>
+
+    <!-- Card 4: Risk Score -->
+    <div class="detail-summary-card">
+        <div class="detail-summary-icon {% if alert.risk == 'HIGH' %}icon-red{% elif alert.risk == 'MEDIUM' %}icon-amber{% else %}icon-green{% endif %}">
+            <i class="bi bi-shield-exclamation"></i>
+        </div>
+        <div>
+            <div class="detail-summary-title">Risk Assessment</div>
+            <div class="detail-summary-val">{{ alert.score }} / 100</div>
+            <div class="detail-summary-sub">{{ alert.risk }} Severity</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main 2-Column Detail Layout -->
+<div class="row g-4 mb-4">
+    <!-- Left Column: Target Host & Port Details -->
+    <div class="col-lg-6">
+        <div class="detail-panel-card">
+            <div class="detail-panel-header">
+                <h5 class="detail-panel-title">
+                    <i class="bi bi-hdd-network text-primary"></i>
+                    Target Host &amp; Port Details
+                </h5>
+                {% if alert.host.is_local %}
+                <span class="badge bg-light text-secondary border px-2 py-1 small">Local System</span>
+                {% else %}
+                <span class="badge bg-light text-secondary border px-2 py-1 small">Remote Agent</span>
+                {% endif %}
+            </div>
+            <div class="detail-panel-body">
+                <div class="detail-spec-list">
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-display"></i> Host Name
+                        </span>
+                        <span class="detail-spec-val">{{ alert.host.name }}</span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-globe"></i> IP Address
+                        </span>
+                        <span class="detail-spec-val">
+                            <span class="spec-code-badge">{{ alert.host.ip_address }}</span>
+                        </span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-ethernet"></i> Port / Protocol
+                        </span>
+                        <span class="detail-spec-val">
+                            <span class="badge-port-item">{{ alert.port }}</span>
+                            <span class="badge-protocol-pill">{{ alert.protocol }}</span>
+                        </span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-app-indicator"></i> Identified Service
+                        </span>
+                        <span class="detail-spec-val">{{ alert.service or 'Unknown' }}</span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-file-earmark-binary"></i> Active Process
+                        </span>
+                        <span class="detail-spec-val font-monospace">{{ alert.process_name or 'Unknown' }}</span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-hash"></i> Process ID (PID)
+                        </span>
+                        <span class="detail-spec-val">
+                            <span class="spec-code-badge">{{ alert.pid or 'N/A' }}</span>
+                        </span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-speedometer2"></i> Risk Score
+                        </span>
+                        <span class="detail-spec-val">
+                            <div class="risk-score-wrapper">
+                                <span class="risk-score-badge {{ alert.risk|lower }}">{{ alert.score }} / 100</span>
+                                <div class="risk-bar-container">
+                                    <div class="risk-bar-fill {{ alert.risk|lower }}" style="width: {{ alert.score }}%;"></div>
+                                </div>
+                            </div>
+                        </span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-clock-history"></i> Detection Time
+                        </span>
+                        <span class="detail-spec-val text-secondary small">
+                            {{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if alert.created_at else 'N/A' }}
+                        </span>
+                    </div>
+
+                    <div class="detail-spec-row">
+                        <span class="detail-spec-label">
+                            <i class="bi bi-check2-circle"></i> Resolved Time
+                        </span>
+                        <span class="detail-spec-val small">
+                            {% if alert.resolved_at %}
+                                <span class="text-success fw-semibold">{{ alert.resolved_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+                            {% else %}
+                                <span class="text-muted">Unresolved (Active)</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Technical Rationale & Recommendations -->
+    <div class="col-lg-6">
+        <div class="detail-panel-card">
+            <div class="detail-panel-header">
+                <h5 class="detail-panel-title">
+                    <i class="bi bi-shield-check text-primary"></i>
+                    Investigation &amp; Root Cause Analysis
+                </h5>
+            </div>
+            <div class="detail-panel-body">
+                <!-- Section 1: Why detected -->
+                <div class="investigation-section">
+                    <div class="investigation-subtitle">
+                        <i class="bi bi-question-circle text-primary"></i> Why was this detected?
+                    </div>
+
+                    {% set raw_reasons = alert.reason.split('\n') if alert.reason else [] %}
+                    {% set lead_reason = '' %}
+                    {% set bullet_reasons = [] %}
+                    {% for r in raw_reasons %}
+                        {% set cleaned = r.replace('•', '').replace('', '').replace('*', '').replace('-', '').strip() %}
+                        {% if cleaned %}
+                            {% if loop.first and not (r.startswith('•') or r.startswith('') or r.startswith('*') or r.startswith('-')) %}
+                                {% set lead_reason = cleaned %}
+                            {% else %}
+                                {% set _ = bullet_reasons.append(cleaned) %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if not lead_reason and bullet_reasons %}
+                        {% set lead_reason = bullet_reasons[0] %}
+                        {% set bullet_reasons = bullet_reasons[1:] %}
+                    {% endif %}
+
+                    <div class="anomaly-callout-card {{ alert.risk|lower }}">
+                        <div class="anomaly-lead-text">{{ lead_reason or 'New socket listening state anomaly detected.' }}</div>
+                        {% if bullet_reasons %}
+                        <ul class="anomaly-list">
+                            {% for b in bullet_reasons %}
+                            <li class="anomaly-item">
+                                <i class="bi bi-exclamation-circle-fill"></i>
+                                <span>{{ b }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Section 2: Security Actions -->
+                <div class="investigation-section">
+                    <div class="investigation-subtitle">
+                        <i class="bi bi-shield-shaded text-success"></i> Recommended Security Actions
+                    </div>
+
+                    {% set raw_recs = alert.recommendation.split('\n') if alert.recommendation else [] %}
+                    {% set bullet_recs = [] %}
+                    {% for rc in raw_recs %}
+                        {% set clean_rc = rc.replace('•', '').replace('', '').replace('*', '').replace('-', '').strip() %}
+                        {% if clean_rc %}
+                            {% set _ = bullet_recs.append(clean_rc) %}
+                        {% endif %}
+                    {% endfor %}
+
+                    <div class="remediation-callout-card">
+                        <ul class="remediation-list">
+                            {% for rc in bullet_recs %}
+                            <li class="remediation-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>{{ rc }}</span>
+                            </li>
+                            {% else %}
+                            <li class="remediation-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>Verify service authorization and adjust baseline in Settings if expected.</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Section 3: Policy Context -->
+                <div class="compliance-info-card">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <div>
+                        <strong>Baseline Policy Note:</strong> PortZen continuously monitors network interfaces for unexpected listening sockets. Once verified as legitimate, this port can be whitelisted into the baseline configuration under Settings.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

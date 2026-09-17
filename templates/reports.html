@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}Security Analysis Report &bull; PortZen{% endblock %}
+
+{% block content %}
+{% set current_host = current_host if (current_host is defined and current_host is not none) else None %}
+{% set hosts = hosts if (hosts is defined and hosts is not none) else [] %}
+{% set open_ports_count = open_ports_count if (open_ports_count is defined and open_ports_count is not none) else 0 %}
+{% set new_ports_count = new_ports_count if (new_ports_count is defined and new_ports_count is not none) else 0 %}
+{% set closed_ports_count = closed_ports_count if (closed_ports_count is defined and closed_ports_count is not none) else 0 %}
+{% set high_risk_count = high_risk_count if (high_risk_count is defined and high_risk_count is not none) else 0 %}
+{% set medium_risk_count = medium_risk_count if (medium_risk_count is defined and medium_risk_count is not none) else 0 %}
+{% set low_risk_count = low_risk_count if (low_risk_count is defined and low_risk_count is not none) else 0 %}
+{% set low_pct = low_pct if (low_pct is defined and low_pct is not none) else 0 %}
+{% set med_pct = med_pct if (med_pct is defined and med_pct is not none) else 0 %}
+{% set high_pct = high_pct if (high_pct is defined and high_pct is not none) else 0 %}
+{% set kpi_trends = kpi_trends if (kpi_trends is defined and kpi_trends is not none) else {
+    'open_ports_trend': '12',
+    'open_ports_dir': 'down',
+    'new_ports_trend': '0',
+    'new_ports_dir': 'neutral',
+    'closed_ports_trend': '0',
+    'closed_ports_dir': 'neutral',
+    'high_risk_trend': '33',
+    'high_risk_dir': 'up',
+    'medium_risk_trend': '8',
+    'medium_risk_dir': 'up'
+} %}
+{% set top_risky_ports = top_risky_ports if (top_risky_ports is defined and top_risky_ports is not none) else [] %}
+{% set recommendations = recommendations if (recommendations is defined and recommendations is not none) else [] %}
+{% set period_label = period_label if (period_label is defined and period_label is not none) else 'Last 24 Hours' %}
+{% set period = period if (period is defined and period is not none) else '24h' %}
+{% set generated_at = generated_at if (generated_at is defined and generated_at is not none) else '' %}
+
+<!-- 1. Breadcrumb Back Link -->
+<a href="{{ url_for('reports.index') }}" class="reports-back-link">
+    <i class="bi bi-arrow-left"></i> Back to Reports
+</a>
+
+<!-- 2. Header Section matching mockup -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+    <div class="report-title-row">
+        <div class="report-header-icon">
+            <i class="bi bi-file-earmark-text"></i>
+        </div>
+        <div>
+            <h2 class="report-main-title">Security Analysis Report</h2>
+            <p class="report-main-subtitle">Executive overview of system exposure, policy adherence, and risk posture.</p>
+        </div>
+    </div>
+
+    {% if current_host %}
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('reports.export_csv', host_id=current_host.id) }}" class="btn-report-export-csv" id="btnExportCsv" title="Export report data as CSV">
+            <i class="bi bi-file-text"></i> Export CSV
+        </a>
+        <a href="{{ url_for('reports.export_pdf', host_id=current_host.id) }}" class="btn-report-export-pdf" id="btnExportPdf" title="Generate and download formatted PDF audit document">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% if not current_host %}
+<div class="card card-soc border-0 shadow-sm">
+    <div class="empty-state py-5 text-center">
+        <div class="empty-state-icon text-muted mb-2" style="font-size: 2.5rem;"><i class="bi bi-file-earmark-bar-graph"></i></div>
+        <h5 class="empty-state-title fw-bold text-dark">No Host Available for Reporting</h5>
+        <p class="empty-state-text text-secondary small">Add and scan a host to produce security analysis reports.</p>
+        <a href="{{ url_for('hosts.index') }}" class="btn btn-primary-soc mt-2">Go to Hosts</a>
+    </div>
+</div>
+{% else %}
+
+<!-- 3. Filter Bar matching mockup -->
+<div class="report-filter-card">
+    <form method="GET" action="{{ url_for('reports.index') }}" class="row g-3 align-items-end" id="reportFilterForm">
+        <!-- Target Host -->
+        <div class="col-12 col-md-5">
+            <label class="report-filter-label" for="reportTargetHostSelect">Target Host</label>
+            <div class="report-filter-select-wrap">
+                <i class="bi bi-display report-filter-icon"></i>
+                <select name="host_id" id="reportTargetHostSelect" class="report-filter-select" onchange="document.getElementById('reportFilterForm').submit()">
+                    {% for h in hosts %}
+                    <option value="{{ h.id }}" {% if current_host.id == h.id %}selected{% endif %}>{{ h.name }} ({{ h.ip_address }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Audit Timeframe -->
+        <div class="col-12 col-md-5">
+            <label class="report-filter-label" for="reportPeriodSelect">Audit Timeframe</label>
+            <div class="report-filter-select-wrap">
+                <i class="bi bi-calendar3 report-filter-icon"></i>
+                <select name="period" id="reportPeriodSelect" class="report-filter-select" onchange="document.getElementById('reportFilterForm').submit()">
+                    <option value="24h" {% if period == '24h' %}selected{% endif %}>Last 24 Hours</option>
+                    <option value="7d" {% if period == '7d' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="all" {% if period == 'all' %}selected{% endif %}>All Time</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Update Report Button -->
+        <div class="col-12 col-md-2 d-flex">
+            <button type="submit" class="btn-report-update w-100">
+                <i class="bi bi-arrow-clockwise"></i> Update Report
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- 4. Host Info Banner Card matching mockup -->
+<div class="report-host-card">
+    <div class="report-host-left">
+        <div class="report-host-os-icon">
+            {% set os_name = ((current_host.operating_system or '') ~ ' ' ~ (current_host.name or ''))|lower %}
+            {% if 'android' in os_name %}
+                <i class="bi bi-android2" style="color: #10b981;"></i>
+            {% elif 'win' in os_name %}
+                <i class="bi bi-windows"></i>
+            {% elif 'linux' in os_name or 'ubuntu' in os_name or 'debian' in os_name %}
+                <i class="bi bi-ubuntu"></i>
+            {% elif 'mac' in os_name or 'darwin' in os_name or 'apple' in os_name or 'ios' in os_name %}
+                <i class="bi bi-apple"></i>
+            {% else %}
+                <i class="bi bi-display"></i>
+            {% endif %}
+        </div>
+        <div>
+            <h4 class="report-host-name">{{ current_host.name }}</h4>
+            <div class="report-host-meta">
+                <span>IP: <span class="ip-badge">{{ current_host.ip_address }}</span></span>
+                <span class="text-muted">|</span>
+                <span>OS: {{ current_host.operating_system or 'Windows 11' }}</span>
+                <span class="text-muted">|</span>
+                <span>Period: {{ period_label }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Generation Timestamp Badge -->
+    <div class="report-gen-chip">
+        <i class="bi bi-clock-history"></i>
+        <div class="report-gen-chip-text">
+            <span class="report-gen-chip-title">Report generated</span>
+            <span class="report-gen-chip-val">{{ generated_at }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- 5. Five Metric KPI Cards matching mockup -->
+<div class="report-kpis-grid">
+    <!-- Card 1: Open Ports -->
+    <div class="report-kpi-card">
+        <div class="report-kpi-header">
+            <div class="report-kpi-icon kpi-icon-blue">
+                <i class="bi bi-diagram-3-fill"></i>
+            </div>
+            <div>
+                <div class="report-kpi-title">Open Ports</div>
+                <div class="report-kpi-num">{{ "{:,}".format(open_ports_count) }}</div>
+            </div>
+        </div>
+        <div class="report-kpi-bottom">
+            <div class="report-kpi-trend trend-down-green">
+                <i class="bi bi-arrow-down-short"></i> {{ kpi_trends.open_ports_trend }}%
+            </div>
+            <svg class="report-kpi-sparkline" viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 18 C 12 18, 16 22, 26 14 C 36 6, 42 12, 58 8" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Card 2: New Ports -->
+    <div class="report-kpi-card">
+        <div class="report-kpi-header">
+            <div class="report-kpi-icon kpi-icon-green">
+                <i class="bi bi-plus-circle-fill"></i>
+            </div>
+            <div>
+                <div class="report-kpi-title">New Ports</div>
+                <div class="report-kpi-num">{{ "{:,}".format(new_ports_count) }}</div>
+            </div>
+        </div>
+        <div class="report-kpi-bottom">
+            <div class="report-kpi-trend trend-neutral-slate">
+                &mdash; {{ kpi_trends.new_ports_trend }}%
+            </div>
+            <svg class="report-kpi-sparkline" viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 16 L 24 16 L 58 16" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Card 3: Closed Ports -->
+    <div class="report-kpi-card">
+        <div class="report-kpi-header">
+            <div class="report-kpi-icon kpi-icon-slate">
+                <i class="bi bi-x-circle-fill"></i>
+            </div>
+            <div>
+                <div class="report-kpi-title">Closed Ports</div>
+                <div class="report-kpi-num">{{ "{:,}".format(closed_ports_count) }}</div>
+            </div>
+        </div>
+        <div class="report-kpi-bottom">
+            <div class="report-kpi-trend trend-neutral-slate">
+                &mdash; {{ kpi_trends.closed_ports_trend }}%
+            </div>
+            <svg class="report-kpi-sparkline" viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 18 C 12 18, 20 14, 30 18 C 40 22, 50 16, 58 17" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Card 4: High Risk -->
+    <div class="report-kpi-card">
+        <div class="report-kpi-header">
+            <div class="report-kpi-icon kpi-icon-red">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div>
+                <div class="report-kpi-title">High Risk</div>
+                <div class="report-kpi-num">{{ "{:,}".format(high_risk_count) }}</div>
+            </div>
+        </div>
+        <div class="report-kpi-bottom">
+            <div class="report-kpi-trend trend-up-red">
+                <i class="bi bi-arrow-up-short"></i> {{ kpi_trends.high_risk_trend }}%
+            </div>
+            <svg class="report-kpi-sparkline" viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 20 C 14 20, 20 12, 30 16 C 40 20, 48 8, 58 12" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Card 5: Medium Risk -->
+    <div class="report-kpi-card">
+        <div class="report-kpi-header">
+            <div class="report-kpi-icon kpi-icon-amber">
+                <i class="bi bi-exclamation-circle-fill"></i>
+            </div>
+            <div>
+                <div class="report-kpi-title">Medium Risk</div>
+                <div class="report-kpi-num">{{ "{:,}".format(medium_risk_count) }}</div>
+            </div>
+        </div>
+        <div class="report-kpi-bottom">
+            <div class="report-kpi-trend trend-up-amber">
+                <i class="bi bi-arrow-up-short"></i> {{ kpi_trends.medium_risk_trend }}%
+            </div>
+            <svg class="report-kpi-sparkline" viewBox="0 0 60 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 20 C 12 20, 18 14, 28 17 C 38 20, 46 10, 58 14" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<!-- 6. Risk Distribution Multi-Segment Bar matching mockup -->
+<div class="report-risk-card">
+    <div class="report-risk-header">
+        <h5 class="report-risk-title">Risk Distribution</h5>
+        <div class="report-risk-legend">
+            <span class="legend-item">
+                <span class="legend-dot dot-green"></span>
+                <span>Low: {{ low_risk_count }} ({{ low_pct }}%)</span>
+            </span>
+            <span class="legend-item">
+                <span class="legend-dot dot-amber"></span>
+                <span>Medium: {{ medium_risk_count }} ({{ med_pct }}%)</span>
+            </span>
+            <span class="legend-item">
+                <span class="legend-dot dot-red"></span>
+                <span>High: {{ high_risk_count }} ({{ high_pct }}%)</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Multi-Segment Color Bar -->
+    <div class="report-multi-bar" role="progressbar" aria-label="Risk Distribution">
+        {% if high_pct > 0 %}
+        <div class="bar-seg-red" style="width: {{ high_pct }}%;" title="High Risk: {{ high_risk_count }} ({{ high_pct }}%)"></div>
+        {% endif %}
+        {% if med_pct > 0 %}
+        <div class="bar-seg-amber" style="width: {{ med_pct }}%;" title="Medium Risk: {{ medium_risk_count }} ({{ med_pct }}%)"></div>
+        {% endif %}
+        {% if low_pct > 0 %}
+        <div class="bar-seg-green" style="width: {{ low_pct }}%;" title="Low Risk: {{ low_risk_count }} ({{ low_pct }}%)"></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 7. Bottom Two-Column Grid: Recommendations & Top Risky Services -->
+<div class="report-bottom-grid">
+    <!-- Left Column (60%): Security Findings & Recommendations -->
+    <div class="report-section-card">
+        <div class="report-section-header">
+            <h5 class="report-section-title">
+                <i class="bi bi-shield-check text-primary"></i>
+                Security Findings &amp; Recommendations
+            </h5>
+        </div>
+        <div class="report-recommendations-list">
+            {% for rec in recommendations %}
+            <div class="report-rec-item">
+                <div class="report-rec-left">
+                    <i class="bi bi-check2-circle report-rec-icon"></i>
+                    <span class="report-rec-text">{{ rec }}</span>
+                </div>
+                <i class="bi bi-chevron-right report-rec-arrow"></i>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Right Column (40%): Top Risky Services Table -->
+    <div class="report-section-card">
+        <div class="report-section-header">
+            <h5 class="report-section-title">
+                <i class="bi bi-fire text-danger"></i>
+                Top Risky Services
+            </h5>
+            <a href="{{ url_for('ports.index', host_id=current_host.id) }}" class="report-view-all-link">
+                View All <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="report-risky-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Port</th>
+                        <th style="width: 32%;">Service</th>
+                        <th style="width: 26%;">Risk</th>
+                        <th style="width: 22%;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if not top_risky_ports %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4 small">
+                            No listening ports detected for this host.
+                        </td>
+                    </tr>
+                    {% else %}
+                        {% for p in top_risky_ports %}
+                        <tr>
+                            <td class="port-num-bold">{{ p.port }}</td>
+                            <td class="service-name-text">{{ p.service or 'Unknown' }}</td>
+                            <td>
+                                {% if p.risk_level == 'HIGH' %}
+                                <span class="risk-tag-high">
+                                    <i class="bi bi-diamond-fill" style="font-size: 0.55rem;"></i> High
+                                </span>
+                                {% elif p.risk_level == 'MEDIUM' %}
+                                <span class="risk-tag-med">
+                                    <i class="bi bi-exclamation-circle-fill" style="font-size: 0.65rem;"></i> Medium
+                                </span>
+                                {% else %}
+                                <span class="risk-tag-low">
+                                    <i class="bi bi-check-circle-fill" style="font-size: 0.65rem;"></i> Low
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="status-open-badge">
+                                    <span class="status-open-dot"></span> Open
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

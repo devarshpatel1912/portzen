@@ -1,0 +1,11 @@
+{
+  "monitoring_engine": "local",
+  "scan_closed_ports": false,
+  "notifications": {
+    "dashboard_alerts": true,
+    "email_notifications": false,
+    "high_risk_alerts": true,
+    "process_change_alerts": true,
+    "daily_summary": false
+  }
+}

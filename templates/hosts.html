@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block title %}Authorized Hosts{% endblock %}
+
+{% block content %}
+<!-- Page Header matching mockup -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold text-dark mb-1" style="letter-spacing: -0.02em; font-size: 1.75rem;">Authorized Hosts</h2>
+        <p class="text-secondary mb-0" style="font-size: 0.9rem;">
+            Manage network endpoints authorized for continuous port discovery and compliance tracking.
+        </p>
+    </div>
+
+    <div>
+        <button class="btn btn-primary-soc px-3 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addHostModal">
+            <i class="bi bi-plus-lg me-1"></i> Add Host
+        </button>
+    </div>
+</div>
+
+<!-- Authorization Notice Banner matching mockup -->
+<div class="alert host-notice-banner alert-dismissible fade show" role="alert">
+    <div class="d-flex align-items-start gap-3">
+        <div class="notice-icon-box">
+            <i class="bi bi-info-circle fs-5"></i>
+        </div>
+        <div>
+            <div class="notice-title">Authorization Notice</div>
+            <p class="notice-text">
+                Only monitor systems you own or have explicit, documented authorization to test. Unauthorized port inspection of third-party networks may violate applicable cyber policies.
+            </p>
+        </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.8rem;"></button>
+</div>
+
+<!-- Filter & Controls Bar matching mockup -->
+<div class="host-filter-bar">
+    <!-- Left Filter Tabs -->
+    <div class="host-filter-tabs" id="hostFilterTabs">
+        <button class="host-filter-tab active" data-filter="all">
+            All Hosts ({{ total_hosts|default(hosts|length) }})
+        </button>
+        <button class="host-filter-tab" data-filter="online">
+            <span class="filter-indicator-dot bg-success"></span> Online ({{ online_count|default(0) }})
+        </button>
+        <button class="host-filter-tab" data-filter="offline">
+            <span class="filter-indicator-dot bg-danger"></span> Offline ({{ offline_count|default(hosts|length) }})
+        </button>
+    </div>
+
+    <!-- Right Controls: Sort and Grid/List view -->
+    <div class="host-controls-right">
+        <span class="host-sort-label">Sort by</span>
+        <select class="host-sort-select" id="hostSortSelect">
+            <option value="name-asc" selected>Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="ports-desc">Open Ports (High-Low)</option>
+            <option value="alerts-desc">Active Alerts (High-Low)</option>
+        </select>
+        <div class="d-flex align-items-center gap-1">
+            <button class="btn-view-toggle active" id="viewGridBtn" title="Grid View" data-view="grid">
+                <i class="bi bi-grid-3x3-gap"></i>
+            </button>
+            <button class="btn-view-toggle" id="viewListBtn" title="List View" data-view="list">
+                <i class="bi bi-list-ul"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Host Cards Container (Grid / List) -->
+<div class="row g-4" id="hostsContainer">
+    {% for item in hosts %}
+    {% set h = item.host %}
+    {% set is_online = item.is_monitoring %}
+    <div class="col-12 col-lg-6 host-card-item" 
+         data-host-id="{{ h.id }}"
+         data-name="{{ h.name|lower }}"
+         data-status="{% if is_online %}online{% else %}offline{% endif %}"
+         data-ports="{{ item.open_ports }}"
+         data-alerts="{{ item.active_alerts }}">
+        
+        <div class="host-soc-card">
+            <!-- Card Header: Device Icon, Name, IP, Location, Status, Timestamps -->
+            <div class="host-card-header">
+                <div class="d-flex align-items-start gap-3">
+                    {% set os_raw = ((h.operating_system or '') ~ ' ' ~ (h.name or ''))|lower %}
+                    <!-- Icon Box -->
+                    <div class="host-device-icon {% if 'android' in os_raw %}icon-bg-emerald{% elif 'win' in os_raw %}icon-bg-blue{% elif 'apple' in os_raw or 'mac' in os_raw or 'ios' in os_raw %}icon-bg-dark{% elif 'linux' in os_raw or 'ubuntu' in os_raw or 'debian' in os_raw %}icon-bg-orange{% else %}icon-bg-purple{% endif %}">
+                        {% if 'android' in os_raw %}
+                        <!-- Android Logo Icon -->
+                        <i class="bi bi-android2" style="font-size: 1.65rem; color: #10b981;"></i>
+                        {% elif 'win' in os_raw %}
+                        <!-- Windows Logo SVG -->
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M0 3.449L9.75 2.1v9.451H0V3.449zm10.98-1.574L24 0v11.551H10.98V1.875zM0 12.45h9.75v9.45L0 20.551v-8.101zm10.98 0H24V24l-13.02-1.875V12.45z" fill="#0284c7"/>
+                        </svg>
+                        {% elif 'apple' in os_raw or 'mac' in os_raw or 'ios' in os_raw %}
+                        <i class="bi bi-apple" style="font-size: 1.5rem; color: #0f172a;"></i>
+                        {% elif 'linux' in os_raw or 'ubuntu' in os_raw or 'debian' in os_raw %}
+                        <i class="bi bi-ubuntu" style="font-size: 1.5rem; color: #ea580c;"></i>
+                        {% else %}
+                        <!-- Desktop / Monitor SVG -->
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                        {% endif %}
+                    </div>
+
+                    <!-- Host Info -->
+                    <div>
+                        <div class="host-title-block">
+                            <a href="{{ url_for('hosts.detail', host_id=h.id) }}" class="host-card-title">{{ h.name }}</a>
+                            {% if h.is_local or h.ip_address in ['127.0.0.1', 'localhost'] %}
+                            <span class="badge-this-device">This Device</span>
+                            {% endif %}
+                        </div>
+                        <div class="host-subtitle-row">
+                            <span class="host-subtitle-item">
+                                <i class="bi bi-arrow-down-up" style="font-size: 0.75rem;"></i>
+                                <span class="fw-semibold text-secondary">{{ h.ip_address }}</span>
+                            </span>
+                            <span class="host-subtitle-item">
+                                <i class="bi bi-geo-alt" style="font-size: 0.75rem;"></i>
+                                {% if h.is_local or h.ip_address in ['127.0.0.1', 'localhost'] %}
+                                Local
+                                {% elif h.ip_address.startswith(('192.168.', '10.', '172.')) %}
+                                Private Network
+                                {% else %}
+                                External Target
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Status Pill & Timestamps -->
+                <div class="host-header-status-col">
+                    {% if is_online %}
+                    <span class="host-status-pill status-active">
+                        <span class="filter-indicator-dot bg-success"></span> ACTIVE
+                    </span>
+                    {% else %}
+                    <span class="host-status-pill status-stopped">
+                        <span class="filter-indicator-dot bg-danger"></span> STOPPED
+                    </span>
+                    {% endif %}
+                    <div class="host-timestamp-text">
+                        Last scan: {{ item.last_scan.strftime('%H:%M:%S') if item.last_scan else '08:13:47' }}<br>
+                        Added: {{ h.created_at.strftime('%b %d, %Y') if h.created_at else 'Sep 10, 2024' }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Host Metadata: Operating System & Description -->
+            <div class="host-meta-grid">
+                <div>
+                    <div class="host-meta-label">
+                        <i class="bi bi-shield"></i> Operating System
+                    </div>
+                    <div class="host-meta-val">
+                        {% if 'android' in os_raw %}
+                        <i class="bi bi-android2 text-success me-1" style="font-size: 0.95rem;"></i>
+                        {% elif 'win' in os_raw %}
+                        <!-- Mini Windows Logo -->
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#0284c7" class="me-1">
+                            <path d="M0 3.449L9.75 2.1v9.451H0V3.449zm10.98-1.574L24 0v11.551H10.98V1.875zM0 12.45h9.75v9.45L0 20.551v-8.101zm10.98 0H24V24l-13.02-1.875V12.45z"/>
+                        </svg>
+                        {% elif 'apple' in os_raw or 'mac' in os_raw or 'ios' in os_raw %}
+                        <i class="bi bi-apple text-dark me-1"></i>
+                        {% elif 'linux' in os_raw or 'ubuntu' in os_raw or 'debian' in os_raw %}
+                        <i class="bi bi-ubuntu text-warning me-1"></i>
+                        {% else %}
+                        <i class="bi bi-display text-primary me-1"></i>
+                        {% endif %}
+                        {{ h.operating_system or 'Unknown' }}
+                    </div>
+                </div>
+                <div>
+                    <div class="host-meta-label">Description</div>
+                    <div class="host-meta-val text-truncate" title="{{ h.description or 'No description' }}">
+                        {{ h.description or 'Local development machine' }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inset Stats Box: Open Ports | Baseline | Active Alerts -->
+            <div class="host-stats-panel">
+                <div class="host-stat-col">
+                    <span class="host-stat-label">Open Ports</span>
+                    <span class="host-stat-number">{{ item.open_ports }}</span>
+                </div>
+                <div class="host-stat-col">
+                    <span class="host-stat-label">Baseline</span>
+                    <span class="host-stat-number">{{ item.baseline_ports }}</span>
+                </div>
+                <div class="host-stat-col">
+                    <span class="host-stat-label">Active Alerts</span>
+                    <span class="host-stat-number stat-alert">{{ item.active_alerts }}</span>
+                </div>
+            </div>
+
+            <!-- Bottom Actions Row matching mockup -->
+            <div class="host-actions-row">
+                <a href="{{ url_for('hosts.detail', host_id=h.id) }}" class="btn btn-host-view">
+                    <i class="bi bi-eye"></i> View Details
+                </a>
+                <button class="btn btn-host-action btn-scan-now" data-host-id="{{ h.id }}" title="Scan this host now">
+                    <i class="bi bi-arrow-repeat"></i> Scan Now
+                </button>
+                {% if is_online %}
+                <button class="btn btn-host-action btn-toggle-monitor text-danger" data-host-id="{{ h.id }}" data-action="stop" title="Stop monitoring">
+                    <i class="bi bi-stop-circle"></i> Stop Monitoring
+                </button>
+                {% else %}
+                <button class="btn btn-host-action btn-toggle-monitor" data-host-id="{{ h.id }}" data-action="start" title="Start monitoring">
+                    <i class="bi bi-play"></i> Start Monitoring
+                </button>
+                {% endif %}
+                
+                <!-- More Actions Dropdown -->
+                <div class="dropdown ms-auto">
+                    <button class="btn btn-host-more" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Options">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2">
+                        <li>
+                            <form action="{{ url_for('hosts.create_baseline', host_id=h.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="dropdown-item">
+                                    <i class="bi bi-bookmark-check text-primary me-2"></i> Update Baseline
+                                </button>
+                            </form>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('ports.index') }}?host_id={{ h.id }}">
+                                <i class="bi bi-diagram-3 text-secondary me-2"></i> View Open Ports
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('alerts.index') }}?host_id={{ h.id }}">
+                                <i class="bi bi-exclamation-triangle text-warning me-2"></i> View Host Alerts
+                            </a>
+                        </li>
+                        {% if not h.is_local and h.ip_address not in ['127.0.0.1', 'localhost'] %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form action="{{ url_for('hosts.delete_host', host_id=h.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete host {{ h.name }}?');">
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="bi bi-trash me-2"></i> Delete Host
+                                </button>
+                            </form>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add Another Host Promo Box matching mockup -->
+<div class="add-host-promo-box">
+    <div class="promo-icon-circle">
+        <!-- Server Rack Icon SVG -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+        </svg>
+    </div>
+    <div class="promo-title">Add Another Host</div>
+    <div class="promo-text">
+        Monitor additional authorized systems to keep track of your network exposure.
+    </div>
+    <button class="btn btn-primary-soc px-4 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#addHostModal">
+        <i class="bi bi-plus-lg me-1"></i> Add Host
+    </button>
+</div>
+
+<!-- Add Host Modal matching mockup fields -->
+<div class="modal fade" id="addHostModal" tabindex="-1" aria-labelledby="addHostModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+            <div class="modal-header border-bottom px-4 py-3">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="addHostModalLabel">
+                    <i class="bi bi-display text-primary"></i> Add Authorized Host
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('hosts.add_host') }}" method="POST">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label for="hostName" class="form-label small fw-bold text-dark">Host Name</label>
+                        <input type="text" class="form-control" id="hostName" name="name" placeholder="e.g. window / Linux Server" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ipAddress" class="form-label small fw-bold text-dark">IP Address</label>
+                        <input type="text" class="form-control" id="ipAddress" name="ip_address" placeholder="e.g. 10.68.4.38" required>
+                        <div class="form-text small text-muted">Use 127.0.0.1 for local host monitoring via system socket APIs.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="osName" class="form-label small fw-bold text-dark">Operating System</label>
+                        <input type="text" class="form-control" id="osName" name="operating_system" placeholder="e.g. Windows 11 / Ubuntu 22.04 LTS" value="Windows 11">
+                    </div>
+                    <div class="mb-3">
+                        <label for="desc" class="form-label small fw-bold text-dark">Description</label>
+                        <input type="text" class="form-control" id="desc" name="description" placeholder="e.g. office pc / development workstation">
+                    </div>
+                </div>
+                <div class="modal-footer border-top px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-soc btn-sm px-4">Add Host</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Filter Tabs (All / Online / Offline)
+    const filterTabs = document.querySelectorAll('.host-filter-tab');
+    const cards = document.querySelectorAll('.host-card-item');
+
+    filterTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            filterTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const filter = tab.getAttribute('data-filter');
+
+            cards.forEach(card => {
+                const status = card.getAttribute('data-status');
+                if (filter === 'all' || status === filter) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+
+    // 2. Sort Dropdown
+    const sortSelect = document.getElementById('hostSortSelect');
+    const container = document.getElementById('hostsContainer');
+
+    if (sortSelect && container) {
+        sortSelect.addEventListener('change', () => {
+            const val = sortSelect.value;
+            const items = Array.from(cards);
+
+            items.sort((a, b) => {
+                if (val === 'name-asc') {
+                    return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+                } else if (val === 'name-desc') {
+                    return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'));
+                } else if (val === 'ports-desc') {
+                    return parseInt(b.getAttribute('data-ports') || 0) - parseInt(a.getAttribute('data-ports') || 0);
+                } else if (val === 'alerts-desc') {
+                    return parseInt(b.getAttribute('data-alerts') || 0) - parseInt(a.getAttribute('data-alerts') || 0);
+                }
+                return 0;
+            });
+
+            items.forEach(item => container.appendChild(item));
+        });
+    }
+
+    // 3. Grid vs List View Toggle
+    const gridBtn = document.getElementById('viewGridBtn');
+    const listBtn = document.getElementById('viewListBtn');
+
+    if (gridBtn && listBtn) {
+        gridBtn.addEventListener('click', () => {
+            gridBtn.classList.add('active');
+            listBtn.classList.remove('active');
+            cards.forEach(card => {
+                card.className = 'col-12 col-lg-6 host-card-item';
+            });
+        });
+
+        listBtn.addEventListener('click', () => {
+            listBtn.classList.add('active');
+            gridBtn.classList.remove('active');
+            cards.forEach(card => {
+                card.className = 'col-12 host-card-item';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

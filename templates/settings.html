@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+
+{% block title %}Settings &bull; PortZen{% endblock %}
+
+{% block content %}
+{# Defensive variable defaults #}
+{% set system_settings = system_settings if (system_settings is defined and system_settings is not none) else {
+  'monitoring_engine': 'local',
+  'scan_closed_ports': false,
+  'notifications': {
+    'dashboard_alerts': true,
+    'email_notifications': false,
+    'high_risk_alerts': true,
+    'process_change_alerts': true,
+    'daily_summary': false
+  }
+} %}
+{% set notifs = system_settings.notifications if (system_settings.notifications is defined and system_settings.notifications is not none) else {
+  'dashboard_alerts': true,
+  'email_notifications': false,
+  'high_risk_alerts': true,
+  'process_change_alerts': true,
+  'daily_summary': false
+} %}
+{% set recent_logs = recent_logs if (recent_logs is defined and recent_logs is not none) else [] %}
+{% set supported_intervals = supported_intervals if (supported_intervals is defined and supported_intervals is not none) else [10, 30, 60, 300, 900, 1800] %}
+
+<!-- Page Header -->
+<div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between mb-4 gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="settings-header-icon">
+            <i class="bi bi-gear" style="font-size: 2.1rem; color: #2563eb;"></i>
+        </div>
+        <div>
+            <h2 class="fw-bold mb-1" style="font-size: 1.75rem; color: #0f172a; letter-spacing: -0.02em;">Settings</h2>
+            <p class="text-secondary mb-0" style="font-size: 0.88rem;">Configure monitoring policies, automated intervals, credentials, and notification rules.</p>
+        </div>
+    </div>
+    <form action="{{ url_for('settings.reset_defaults') }}" method="POST" onsubmit="return confirm('Reset all monitoring policies and notification preferences to defaults?');" class="m-0">
+        <button type="submit" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2 px-3 py-2 shadow-sm" style="background: #ffffff; border-color: #cbd5e1; color: #475569; font-weight: 500; font-size: 0.86rem; border-radius: 8px;">
+            <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+        </button>
+    </form>
+</div>
+
+<!-- 2x2 Grid Layout of Modern SOC Settings Cards -->
+<div class="row g-4">
+    <!-- Card 1: Monitoring Policy (Top-Left) -->
+    <div class="col-lg-6">
+        <div class="settings-card">
+            <div class="settings-card-header">
+                <div class="settings-title-group">
+                    <div class="settings-icon-badge">
+                        <i class="bi bi-clock"></i>
+                    </div>
+                    <div>
+                        <h4 class="settings-card-title">Monitoring Policy</h4>
+                        <p class="settings-card-desc">Configure how PortZen monitors your environment.</p>
+                    </div>
+                </div>
+                <!-- Monitor Pulse Graphic Illustration -->
+                <div class="settings-illustration-box" title="PortZen Network Monitor Engine">
+                    <svg width="48" height="42" viewBox="0 0 48 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="5" y="4" width="38" height="26" rx="5" stroke="#93c5fd" stroke-width="2.5" fill="#ffffff"/>
+                        <path d="M10 18H16L19 11L23 25L27 14L30 18H38" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M18 36H30" stroke="#93c5fd" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M24 30V36" stroke="#93c5fd" stroke-width="2.5"/>
+                    </svg>
+                </div>
+            </div>
+
+            <form action="{{ url_for('settings.update_monitoring') }}" method="POST" class="d-flex flex-column flex-grow-1">
+                <!-- Monitoring Engine Dropdown -->
+                <div class="mb-3">
+                    <label for="monitoringEngine" class="form-label small fw-semibold text-dark mb-1">Monitoring Engine</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted" style="border-radius: 8px 0 0 8px; border-color: #cbd5e1;">
+                            <i class="bi bi-display"></i>
+                        </span>
+                        <select class="form-select form-select-sm border-start-0" id="monitoringEngine" name="monitoring_engine" style="border-radius: 0 8px 8px 0; border-color: #cbd5e1; font-size: 0.88rem; height: 38px;">
+                            <option value="local" {% if system_settings.monitoring_engine == 'local' %}selected{% endif %}>Local Host Engine</option>
+                            <option value="distributed" disabled>Distributed Cluster Sensor (Enterprise)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Continuous Scan Interval Dropdown -->
+                <div class="mb-3">
+                    <label for="scanInterval" class="form-label small fw-semibold text-dark mb-1">Continuous Scan Interval</label>
+                    <select class="form-select form-select-sm" id="scanInterval" name="interval_seconds" style="border-radius: 8px; border-color: #cbd5e1; font-size: 0.88rem; height: 38px;">
+                        <option value="30" {% if config and config.interval_seconds == 30 %}selected{% endif %}>30 seconds</option>
+                        <option value="60" {% if not config or config.interval_seconds == 60 %}selected{% endif %}>1 minute</option>
+                        <option value="300" {% if config and config.interval_seconds == 300 %}selected{% endif %}>5 minutes</option>
+                        <option value="900" {% if config and config.interval_seconds == 900 %}selected{% endif %}>15 minutes</option>
+                        <option value="1800" {% if config and config.interval_seconds == 1800 %}selected{% endif %}>30 minutes</option>
+                    </select>
+                    <div class="form-text small text-secondary mt-1" style="font-size: 0.78rem;">Controls frequency of background port audits for active hosts.</div>
+                </div>
+
+                <!-- Toggle 1: Auto-start on boot -->
+                <div class="settings-switch-row mt-1">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">Auto-start monitoring on server boot</div>
+                        <div class="settings-switch-sub">Automatically begin monitoring when the system starts.</div>
+                    </div>
+                    <label class="soc-toggle" for="autoStartSwitch">
+                        <input type="checkbox" id="autoStartSwitch" name="auto_start" {% if config and config.auto_start %}checked{% endif %}>
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 2: Scan closed ports -->
+                <div class="settings-switch-row">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">Scan closed ports periodically</div>
+                        <div class="settings-switch-sub">Include closed ports in scheduled scans.</div>
+                    </div>
+                    <label class="soc-toggle" for="scanClosedSwitch">
+                        <input type="checkbox" id="scanClosedSwitch" name="scan_closed_ports" {% if system_settings.scan_closed_ports %}checked{% endif %}>
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <div class="mt-auto pt-3">
+                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-2 shadow-sm" style="background: #2563eb; border: none; font-weight: 500; font-size: 0.88rem; border-radius: 8px;">
+                        <i class="bi bi-floppy"></i> Save Monitoring Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Card 2: Alert Notifications (Top-Right) -->
+    <div class="col-lg-6">
+        <div class="settings-card">
+            <div class="settings-card-header">
+                <div class="settings-title-group">
+                    <div class="settings-icon-badge">
+                        <i class="bi bi-bell"></i>
+                    </div>
+                    <div>
+                        <h4 class="settings-card-title">Alert Notifications</h4>
+                        <p class="settings-card-desc">Configure how you want to be notified about security events.</p>
+                    </div>
+                </div>
+                <!-- Envelope & Ringing Bell Graphic Illustration -->
+                <div class="settings-illustration-box" title="Notification Dispatcher">
+                    <svg width="48" height="42" viewBox="0 0 48 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="5" y="12" width="38" height="24" rx="4" fill="#ffffff" stroke="#93c5fd" stroke-width="2"/>
+                        <path d="M5 15L24 26L43 15" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="36" cy="11" r="9" fill="#eff6ff"/>
+                        <path d="M36 6C34.3431 6 33 7.34315 33 9V12L31.5 14H40.5L39 12V9C39 7.34315 37.6569 6 36 6Z" fill="#2563eb"/>
+                        <circle cx="36" cy="15.5" r="1" fill="#2563eb"/>
+                    </svg>
+                </div>
+            </div>
+
+            <form action="{{ url_for('settings.update_notifications') }}" method="POST" id="notificationsForm" class="d-flex flex-column flex-grow-1">
+                <!-- Toggle 1: Dashboard Alerts -->
+                <div class="settings-switch-row">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">Dashboard Security Alerts (Active)</div>
+                        <div class="settings-switch-sub">Show real-time alerts on dashboard.</div>
+                    </div>
+                    <label class="soc-toggle" for="dashAlertsSwitch">
+                        <input type="checkbox" id="dashAlertsSwitch" name="dashboard_alerts" {% if notifs.dashboard_alerts %}checked{% endif %} onchange="autoSaveNotifications()">
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 2: Email Notifications -->
+                <div class="settings-switch-row">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">Email Notifications (SMTP)</div>
+                        <div class="settings-switch-sub">Send alert notifications to email.</div>
+                    </div>
+                    <label class="soc-toggle" for="emailAlertsSwitch">
+                        <input type="checkbox" id="emailAlertsSwitch" name="email_notifications" {% if notifs.email_notifications %}checked{% endif %} onchange="autoSaveNotifications()">
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 3: High-Risk Port Alerts -->
+                <div class="settings-switch-row">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">High-Risk Port Alerts</div>
+                        <div class="settings-switch-sub">Get immediate alerts for high-risk ports.</div>
+                    </div>
+                    <label class="soc-toggle" for="highRiskSwitch">
+                        <input type="checkbox" id="highRiskSwitch" name="high_risk_alerts" {% if notifs.high_risk_alerts %}checked{% endif %} onchange="autoSaveNotifications()">
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 4: Process Change Alerts -->
+                <div class="settings-switch-row">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">Process Change Alerts</div>
+                        <div class="settings-switch-sub">Notify when a new process starts listening on a port.</div>
+                    </div>
+                    <label class="soc-toggle" for="processChangeSwitch">
+                        <input type="checkbox" id="processChangeSwitch" name="process_change_alerts" {% if notifs.process_change_alerts %}checked{% endif %} onchange="autoSaveNotifications()">
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 5: Daily Summary Report -->
+                <div class="settings-switch-row">
+                    <div class="settings-switch-info">
+                        <div class="settings-switch-title">Daily Summary Report</div>
+                        <div class="settings-switch-sub">Receive a daily summary of all security events.</div>
+                    </div>
+                    <label class="soc-toggle" for="dailySummarySwitch">
+                        <input type="checkbox" id="dailySummarySwitch" name="daily_summary" {% if notifs.daily_summary %}checked{% endif %} onchange="autoSaveNotifications()">
+                        <span class="soc-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Info Callout Banner -->
+                <div class="settings-info-callout mt-auto">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <p class="settings-info-callout-text">Critical high-risk port exposures and state changes immediately populate the SOC alert queue.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Card 3: Account Security (Bottom-Left) -->
+    <div class="col-lg-6">
+        <div class="settings-card">
+            <div class="settings-card-header mb-3">
+                <div class="settings-title-group">
+                    <div class="settings-icon-badge">
+                        <i class="bi bi-key"></i>
+                    </div>
+                    <div>
+                        <h4 class="settings-card-title">Account Security</h4>
+                        <p class="settings-card-desc">Update your account credentials and improve security.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Info Banner -->
+            <div class="settings-user-banner">
+                <div class="settings-user-avatar">
+                    <i class="bi bi-person-fill"></i>
+                </div>
+                <div>
+                    <div class="settings-user-title">User: {{ user.username if user else 'admin' }}</div>
+                    <p class="settings-user-sub">Manage your password and keep your account safe.</p>
+                </div>
+            </div>
+
+            <form action="{{ url_for('settings.change_password') }}" method="POST" id="passwordForm">
+                <div class="row g-3">
+                    <!-- Left Column: Password Inputs -->
+                    <div class="col-md-7">
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label small fw-semibold text-dark mb-1">Current Password</label>
+                            <div class="pwd-input-wrapper">
+                                <input type="password" class="form-control form-control-sm" id="current_password" name="current_password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required>
+                                <button type="button" class="pwd-toggle-eye" onclick="togglePasswordVisibility('current_password', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label small fw-semibold text-dark mb-1">New Password</label>
+                            <div class="pwd-input-wrapper">
+                                <input type="password" class="form-control form-control-sm" id="new_password" name="new_password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required minlength="8" oninput="validatePasswordRequirements(this.value)">
+                                <button type="button" class="pwd-toggle-eye" onclick="togglePasswordVisibility('new_password', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label small fw-semibold text-dark mb-1">Confirm New Password</label>
+                            <div class="pwd-input-wrapper">
+                                <input type="password" class="form-control form-control-sm" id="confirm_password" name="confirm_password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required minlength="8">
+                                <button type="button" class="pwd-toggle-eye" onclick="togglePasswordVisibility('confirm_password', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Password Requirements Checklist -->
+                    <div class="col-md-5">
+                        <div class="pwd-requirements-card">
+                            <div class="pwd-requirements-header">
+                                <i class="bi bi-shield-check text-primary"></i>
+                                <span>Password Requirements</span>
+                            </div>
+                            <ul class="pwd-req-list">
+                                <li class="pwd-req-item valid" id="req-length">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <span>At least 8 characters</span>
+                                </li>
+                                <li class="pwd-req-item valid" id="req-upper">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <span>One uppercase letter</span>
+                                </li>
+                                <li class="pwd-req-item valid" id="req-lower">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <span>One lowercase letter</span>
+                                </li>
+                                <li class="pwd-req-item valid" id="req-num">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <span>One number</span>
+                                </li>
+                                <li class="pwd-req-item valid" id="req-special">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    <span>One special character</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-2 shadow-sm" style="background: #2563eb; border: none; font-weight: 500; font-size: 0.88rem; border-radius: 8px;">
+                        <i class="bi bi-lock-fill"></i> Update Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Card 4: System Operational Log (Bottom-Right) -->
+    <div class="col-lg-6">
+        <div class="settings-card">
+            <div class="settings-card-header mb-2">
+                <div class="settings-title-group">
+                    <div class="settings-icon-badge">
+                        <i class="bi bi-terminal"></i>
+                    </div>
+                    <div>
+                        <h4 class="settings-card-title">System Operational Log</h4>
+                        <p class="settings-card-desc">Real-time system logs and application events.</p>
+                    </div>
+                </div>
+                <button type="button" id="clearLogBtn" onclick="clearSystemLog()" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-3 py-1 shadow-sm" style="background: #ffffff; border-color: #cbd5e1; color: #475569; font-size: 0.82rem; border-radius: 8px; font-weight: 500;">
+                    <i class="bi bi-trash"></i> Clear Log
+                </button>
+            </div>
+
+            <!-- Terminal Console Window -->
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <span class="log-tab-tag">portzen.log</span>
+                    <span class="live-badge">
+                        <span class="live-pulse-dot"></span>
+                        Live
+                    </span>
+                </div>
+                <div class="terminal-body" id="logTerminalBody">
+                    {% for line in recent_logs %}
+                        {% set log_timestamp = '' %}
+                        {% set log_level = '' %}
+                        {% set log_msg = line %}
+                        
+                        {# Parse timestamp #}
+                        {% if line.startswith('[') and ']' in line %}
+                            {% set parts = line.split(']', 2) %}
+                            {% set log_timestamp = parts[0] ~ ']' %}
+                            {% if parts|length > 1 and '[' in parts[1] %}
+                                {% set lvl_parts = parts[1].split('[') %}
+                                {% set log_level = '[' ~ lvl_parts[1] ~ ']' %}
+                                {% set log_msg = parts[2] if parts|length > 2 else '' %}
+                            {% else %}
+                                {% set log_msg = parts[1] if parts|length > 1 else '' %}
+                            {% endif %}
+                        {% endif %}
+
+                        <div class="log-line">
+                            {% if log_timestamp %}
+                                <span class="log-timestamp">{{ log_timestamp }}</span>
+                            {% endif %}
+                            {% if 'INFO' in log_level or '[INFO]' in line %}
+                                <span class="log-info">[INFO]</span>
+                            {% elif 'WARN' in log_level or '[WARN]' in line %}
+                                <span class="log-warn">[WARN]</span>
+                            {% elif 'ERROR' in log_level or '[ERROR]' in line %}
+                                <span class="log-error">[ERROR]</span>
+                            {% endif %}
+                            <span class="log-text">
+                                {% if '[INFO]' in line %}
+                                    {{ line.split('[INFO]', 1)[1] }}
+                                {% elif '[WARN]' in line %}
+                                    {{ line.split('[WARN]', 1)[1] }}
+                                {% elif '[ERROR]' in line %}
+                                    {{ line.split('[ERROR]', 1)[1] }}
+                                {% else %}
+                                    {{ line }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show/Hide password toggle function
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+
+// Interactive Password Requirements Validator
+function validatePasswordRequirements(val) {
+    const reqLength = document.getElementById('req-length');
+    const reqUpper = document.getElementById('req-upper');
+    const reqLower = document.getElementById('req-lower');
+    const reqNum = document.getElementById('req-num');
+    const reqSpecial = document.getElementById('req-special');
+
+    function updateItem(el, isValid) {
+        const icon = el.querySelector('i');
+        if (isValid) {
+            el.className = 'pwd-req-item valid';
+            icon.className = 'bi bi-check-circle-fill text-success';
+        } else {
+            el.className = 'pwd-req-item invalid';
+            icon.className = 'bi bi-circle';
+        }
+    }
+
+    // Check rules (or default active if blank to match reference mockup)
+    if (!val) {
+        // Keep active checkmarks as in the mockup preview
+        updateItem(reqLength, true);
+        updateItem(reqUpper, true);
+        updateItem(reqLower, true);
+        updateItem(reqNum, true);
+        updateItem(reqSpecial, true);
+        return;
+    }
+
+    updateItem(reqLength, val.length >= 8);
+    updateItem(reqUpper, /[A-Z]/.test(val));
+    updateItem(reqLower, /[a-z]/.test(val));
+    updateItem(reqNum, /[0-9]/.test(val));
+    updateItem(reqSpecial, /[^A-Za-z0-9]/.test(val));
+}
+
+// Auto-save alert notifications on toggle
+function autoSaveNotifications() {
+    const form = document.getElementById('notificationsForm');
+    const formData = new FormData(form);
+    fetch("{{ url_for('settings.update_notifications') }}", {
+        method: "POST",
+        body: formData
+    }).catch(err => console.error("Could not auto-save notifications:", err));
+}
+
+// Clear system logs via AJAX
+function clearSystemLog() {
+    if (!confirm("Are you sure you want to clear system operational logs?")) return;
+
+    fetch("{{ url_for('settings.clear_log') }}", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/json"
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        const terminalBody = document.getElementById('logTerminalBody');
+        const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        terminalBody.innerHTML = `
+            <div class="log-line">
+                <span class="log-timestamp">[${now}]</span>
+                <span class="log-info">[INFO]</span>
+                <span class="log-text"> Operational log cleared. System running normally.</span>
+            </div>
+        `;
+    })
+    .catch(err => {
+        console.error("Failed to clear log:", err);
+        window.location.reload();
+    });
+}
+
+// Auto scroll terminal to bottom on load
+document.addEventListener('DOMContentLoaded', () => {
+    const term = document.getElementById('logTerminalBody');
+    if (term) {
+        term.scrollTop = term.scrollHeight;
+    }
+});
+</script>
+{% endblock %}

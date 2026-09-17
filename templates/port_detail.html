@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Port {{ snapshot.port }}/{{ snapshot.protocol }} &bull; Port Details{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <!-- Top Action Row: Back button and Action buttons -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <a href="{{ url_for('ports.index', host_id=host.id) }}" class="text-secondary small text-decoration-none fw-medium d-inline-flex align-items-center gap-1">
+            <i class="bi bi-arrow-left"></i> Back to Discovered Ports
+        </a>
+
+        <div class="d-flex align-items-center gap-2">
+            <!-- Rescan Port Button -->
+            <form method="POST" action="{{ url_for('ports.rescan_port', snapshot_id=snapshot.id) }}" class="d-inline m-0">
+                <button type="submit" class="btn btn-outline-primary btn-sm px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3 bg-white shadow-none" style="border-color: #93c5fd; color: #2563eb;">
+                    <i class="bi bi-arrow-clockwise"></i> Rescan Port
+                </button>
+            </form>
+
+            <!-- Add to / Remove from Baseline Button -->
+            <form method="POST" action="{{ url_for('ports.toggle_baseline', snapshot_id=snapshot.id) }}" class="d-inline m-0">
+                {% if in_baseline %}
+                <button type="submit" class="btn btn-outline-secondary btn-sm px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3 bg-white text-dark shadow-none border-secondary-subtle">
+                    <i class="bi bi-bookmark-fill text-success"></i> Remove from Baseline
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-outline-secondary btn-sm px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 rounded-3 bg-white text-dark shadow-none border-secondary-subtle">
+                    <i class="bi bi-bookmark"></i> Add to Baseline
+                </button>
+                {% endif %}
+            </form>
+
+            <!-- More Options Dropdown -->
+            <div class="dropdown d-inline">
+                <button class="btn btn-outline-secondary btn-sm px-2.5 py-1.5 rounded-3 bg-white text-secondary shadow-none border-secondary-subtle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 small">
+                    <li><a class="dropdown-item" href="{{ url_for('ports.index', host_id=host.id) }}"><i class="bi bi-list-ul me-2"></i>All Host Ports</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('hosts.detail', host_id=host.id) }}"><i class="bi bi-display me-2"></i>Host Overview</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Title and Host Metadata Row -->
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <h2 class="fw-bold mb-0 text-dark">
+                    Port {{ snapshot.port }} <span class="text-secondary fw-normal fs-4">/ {{ snapshot.protocol }}</span>
+                </h2>
+                {% if risk_data.risk == 'HIGH' %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1.5 rounded-pill fw-bold small ms-1">
+                    <i class="bi bi-shield-slash-fill me-1"></i> HIGH RISK
+                </span>
+                {% elif risk_data.risk == 'MEDIUM' %}
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-1.5 rounded-pill fw-bold small ms-1">
+                    <i class="bi bi-shield-exclamation me-1"></i> MEDIUM RISK
+                </span>
+                {% else %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1.5 rounded-pill fw-bold small ms-1">
+                    <i class="bi bi-shield-check me-1"></i> LOW RISK
+                </span>
+                {% endif %}
+            </div>
+            <p class="text-secondary small mt-1 mb-0">Detailed information and security analysis for this port.</p>
+        </div>
+
+        <div class="text-md-end">
+            <div class="small text-secondary">
+                Host: <strong class="text-dark">{{ host.name }}</strong> ({{ host.ip_address }})
+            </div>
+            <div class="small text-secondary mt-0.5">
+                Last updated: {{ last_seen.strftime('%Y-%m-%d %H:%M:%S UTC') if last_seen else 'N/A' }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Left: Port Technical Information -->
+    <div class="col-lg-6">
+        <div class="card card-custom-white h-100 shadow-sm border" style="border-radius: 12px; border-color: #edf2f7 !important;">
+            <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between" style="border-bottom: 1px solid #f1f5f9;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle text-primary fs-5"></i>
+                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 1.05rem;">Port Information</h5>
+                </div>
+                <div>
+                    {% if snapshot.state == 'LISTEN' %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1.5 rounded-pill fw-bold" style="font-size: 0.75rem; letter-spacing: 0.04em;">
+                        <i class="bi bi-check-circle-fill me-1"></i> LISTENING
+                    </span>
+                    {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary border px-3 py-1.5 rounded-pill fw-bold" style="font-size: 0.75rem; letter-spacing: 0.04em;">
+                        {{ snapshot.state }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div class="d-flex flex-column gap-3">
+                    <!-- Port Number -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-hash fs-5 text-secondary" style="width: 22px;"></i>
+                            <span>Port Number</span>
+                        </div>
+                        <div>
+                            <span class="fw-bold text-dark fs-6">{{ snapshot.port }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Protocol -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-diagram-3 text-secondary" style="width: 22px;"></i>
+                            <span>Protocol</span>
+                        </div>
+                        <div>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded-2 fw-bold" style="font-size: 0.75rem;">
+                                {{ snapshot.protocol }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Service -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-layers text-secondary" style="width: 22px;"></i>
+                            <span>Service</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="fw-bold text-dark" style="font-size: 0.875rem;">{{ snapshot.service or 'Unknown' }}</span>
+                            <i class="bi bi-question-circle text-secondary" style="font-size: 0.8rem; cursor: pointer;" title="Identified service name"></i>
+                        </div>
+                    </div>
+
+                    <!-- Process Name -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-window text-secondary" style="width: 22px;"></i>
+                            <span>Process Name</span>
+                        </div>
+                        <div>
+                            <span class="fw-bold text-dark" style="font-size: 0.875rem;">{{ snapshot.process_name or 'Unknown' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Process ID (PID) -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-gear text-secondary" style="width: 22px;"></i>
+                            <span>Process ID (PID)</span>
+                        </div>
+                        <div>
+                            <span style="color: #db2777; font-weight: 700; font-family: monospace; font-size: 0.9rem;">
+                                {{ snapshot.pid or 'N/A' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Local Address -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-geo-alt text-secondary" style="width: 22px;"></i>
+                            <span>Local Address</span>
+                        </div>
+                        <div>
+                            <span style="color: #db2777; font-weight: 700; font-family: monospace; font-size: 0.9rem;">
+                                {{ snapshot.local_address }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Baseline Status -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-bookmark text-secondary" style="width: 22px;"></i>
+                            <span>Baseline Status</span>
+                        </div>
+                        <div>
+                            {% if in_baseline %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5 rounded-pill fw-semibold" style="font-size: 0.775rem;">
+                                <i class="bi bi-check-circle-fill me-1"></i> Approved Baseline Port
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1.5 rounded-pill fw-semibold" style="font-size: 0.775rem;">
+                                <i class="bi bi-exclamation-circle-fill me-1"></i> Not in Approved Baseline
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- First Discovered -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-calendar3 text-secondary" style="width: 22px;"></i>
+                            <span>First Discovered</span>
+                        </div>
+                        <div class="small text-secondary">
+                            {{ first_seen.strftime('%Y-%m-%d %H:%M:%S UTC') if first_seen else 'N/A' }}
+                        </div>
+                    </div>
+
+                    <!-- Last Observed -->
+                    <div class="d-flex align-items-center justify-content-between py-1">
+                        <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.875rem; font-weight: 500;">
+                            <i class="bi bi-calendar3 text-secondary" style="width: 22px;"></i>
+                            <span>Last Observed</span>
+                        </div>
+                        <div class="small text-secondary">
+                            {{ last_seen.strftime('%Y-%m-%d %H:%M:%S UTC') if last_seen else 'N/A' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Security Risk Analysis -->
+    <div class="col-lg-6">
+        <div class="card card-custom-white h-100 shadow-sm border" style="border-radius: 12px; border-color: #edf2f7 !important;">
+            <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between" style="border-bottom: 1px solid #f1f5f9;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-shield-check text-primary fs-5"></i>
+                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 1.05rem;">Security Risk Analysis</h5>
+                </div>
+                <div class="d-flex align-items-center gap-1.5 small">
+                    <span class="text-secondary fw-medium">Risk Level:</span>
+                    {% if risk_data.risk == 'HIGH' %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 rounded fw-bold" style="font-size: 0.75rem;">HIGH</span>
+                    {% elif risk_data.risk == 'MEDIUM' %}
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1 rounded fw-bold" style="font-size: 0.75rem;">MEDIUM</span>
+                    {% else %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 rounded fw-bold" style="font-size: 0.75rem;">LOW</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <!-- Score Bar Section -->
+                <div class="mb-3">
+                    <div class="text-secondary small fw-medium mb-1">Risk Score</div>
+                    <div class="fs-3 fw-bold text-dark mb-2 lh-1">{{ risk_data.score }} / 100</div>
+                    <div class="progress rounded-pill" style="height: 10px; background-color: #f1f5f9;">
+                        <div class="progress-bar {% if risk_data.risk == 'HIGH' %}bg-danger{% elif risk_data.risk == 'MEDIUM' %}bg-warning{% else %}bg-success{% endif %} rounded-pill" 
+                             role="progressbar" 
+                             style="width: {{ risk_data.score }}%;" 
+                             aria-valuenow="{{ risk_data.score }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Callout Banner matching mockup -->
+                {% if risk_data.risk == 'LOW' %}
+                <div class="p-3 mb-4 rounded-3 d-flex align-items-center gap-3" style="background-color: #ecfdf5; border: 1px solid #a7f3d0;">
+                    <div class="text-success fs-3 lh-1 flex-shrink-0"><i class="bi bi-check-circle-fill"></i></div>
+                    <div>
+                        <div class="fw-bold text-dark small mb-0.5">This port appears to be low risk based on current analysis.</div>
+                        <div class="text-secondary small">{% if in_baseline %}It matches the approved baseline configuration.{% else %}No critical exposure indicators detected.{% endif %}</div>
+                    </div>
+                </div>
+                {% elif risk_data.risk == 'MEDIUM' %}
+                <div class="p-3 mb-4 rounded-3 d-flex align-items-center gap-3" style="background-color: #fffbeb; border: 1px solid #fde68a;">
+                    <div class="text-warning-emphasis fs-3 lh-1 flex-shrink-0"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                    <div>
+                        <div class="fw-bold text-dark small mb-0.5">This port presents a moderate risk level based on current analysis.</div>
+                        <div class="text-secondary small">Review external exposure and baseline compliance.</div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="p-3 mb-4 rounded-3 d-flex align-items-center gap-3" style="background-color: #fef2f2; border: 1px solid #fecaca;">
+                    <div class="text-danger fs-3 lh-1 flex-shrink-0"><i class="bi bi-shield-slash-fill"></i></div>
+                    <div>
+                        <div class="fw-bold text-dark small mb-0.5">High security risk detected on this port!</div>
+                        <div class="text-secondary small">Immediate investigation or remediation recommended.</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Two Column Layout for Rationale & Recommended Actions -->
+                <div class="row g-4">
+                    <!-- Left: Risk Rationale -->
+                    <div class="col-md-6">
+                        <div class="fw-bold text-dark small mb-2.5 d-flex align-items-center gap-2">
+                            <i class="bi bi-file-earmark-text text-primary"></i> Risk Rationale
+                        </div>
+                        <ul class="list-unstyled ps-0 mb-0 d-flex flex-column gap-2">
+                            {% for reason in risk_data.reasons %}
+                            <li class="d-flex align-items-start gap-2 small text-secondary">
+                                <i class="bi bi-check2 text-success fw-bold fs-6 mt-0.5 flex-shrink-0"></i>
+                                <span>{{ reason }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- Right: Recommended Actions -->
+                    <div class="col-md-6">
+                        <div class="fw-bold text-dark small mb-2.5 d-flex align-items-center gap-2">
+                            <i class="bi bi-wrench-adjustable text-primary"></i> Recommended Actions
+                        </div>
+                        <ul class="list-unstyled ps-0 mb-0 d-flex flex-column gap-2">
+                            {% for rec in risk_data.recommendations %}
+                            <li class="d-flex align-items-start gap-1.5 small text-secondary">
+                                <i class="bi bi-arrow-right-short text-success fs-5 lh-1 flex-shrink-0"></i>
+                                <span>{{ rec }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: Port History & Event Log -->
+<div class="card card-custom-white shadow-sm border mb-4" style="border-radius: 12px; border-color: #edf2f7 !important;">
+    <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-bottom: 1px solid #f1f5f9;">
+        <div class="d-flex align-items-center" style="gap: 12px;">
+            <i class="bi bi-clock text-primary" style="font-size: 1.5rem; line-height: 1; flex-shrink: 0;"></i>
+            <div>
+                <h5 class="fw-bold text-dark mb-0" style="font-size: 1.05rem; line-height: 1.3;">Port History &amp; Event Log</h5>
+                <div class="text-secondary small" style="font-size: 0.8rem; margin-top: 2px;">Recent state changes and events for this port.</div>
+            </div>
+        </div>
+        <div>
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm px-3 py-1.5 rounded-3 bg-white text-dark border-secondary-subtle d-inline-flex align-items-center gap-2 small fw-medium dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-calendar3"></i> Last 7 Days
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 small">
+                    <li><a class="dropdown-item active" href="#">Last 7 Days</a></li>
+                    <li><a class="dropdown-item" href="#">Last 30 Days</a></li>
+                    <li><a class="dropdown-item" href="#">All Time</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if not events %}
+        <div class="empty-state py-5 text-center">
+            <i class="bi bi-inbox text-secondary fs-2 mb-2 d-block"></i>
+            <p class="text-muted mb-0 small">No previous events logged for this port.</p>
+        </div>
+        {% else %}
+        <div class="table-responsive">
+            <table class="table align-middle mb-0" style="border-color: #f1f5f9;">
+                <thead style="background-color: #ffffff;">
+                    <tr>
+                        <th class="py-3 px-4 text-secondary small fw-semibold border-bottom" style="font-size: 0.775rem;">Timestamp (UTC)</th>
+                        <th class="py-3 px-4 text-secondary small fw-semibold border-bottom" style="font-size: 0.775rem;">Event</th>
+                        <th class="py-3 px-4 text-secondary small fw-semibold border-bottom" style="font-size: 0.775rem;">Process</th>
+                        <th class="py-3 px-4 text-secondary small fw-semibold border-bottom" style="font-size: 0.775rem;">Previous State</th>
+                        <th class="py-3 px-4 text-secondary small fw-semibold border-bottom" style="font-size: 0.775rem;">Current State</th>
+                        <th class="py-3 px-4 text-secondary small fw-semibold border-bottom" style="font-size: 0.775rem;">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ev in events %}
+                    <tr style="border-bottom: 1px solid #f8fafc;">
+                        <td class="py-3 px-4 text-secondary small">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="py-3 px-4">
+                            {% if ev.event_type == 'NEW_PORT' %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 rounded fw-semibold" style="font-size: 0.725rem;">NEW PORT</span>
+                            {% elif ev.event_type == 'PORT_CLOSED' %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 rounded fw-semibold" style="font-size: 0.725rem;">CLOSED</span>
+                            {% elif ev.event_type == 'PROCESS_CHANGED' %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1 rounded fw-semibold" style="font-size: 0.725rem;">PROCESS CHANGE</span>
+                            {% else %}
+                            <span class="badge bg-light text-secondary border px-2.5 py-1 rounded fw-semibold" style="font-size: 0.725rem;">{{ ev.event_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-dark fw-medium small">{{ ev.process_name or 'Unknown' }}</td>
+                        <td class="py-3 px-4">
+                            <span class="badge bg-light text-secondary border px-2.5 py-1 rounded fw-semibold" style="font-size: 0.725rem;">{{ ev.previous_state or '—' }}</span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 rounded fw-semibold" style="font-size: 0.725rem;">{{ ev.current_state or 'LISTEN' }}</span>
+                        </td>
+                        <td class="py-3 px-4 text-secondary small">{{ ev.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <!-- Footer with Showing count & pagination -->
+        <div class="d-flex align-items-center justify-content-between py-3 px-4 border-top" style="border-color: #f1f5f9 !important;">
+            <div class="text-secondary small">
+                Showing {{ events|length }} of {{ events|length }} events
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <button class="btn btn-sm btn-outline-secondary px-2.5 py-1 disabled border-light-subtle bg-white text-secondary" style="border-radius: 6px;">
+                    <i class="bi bi-chevron-left small"></i>
+                </button>
+                <button class="btn btn-sm btn-primary px-3 py-1 fw-bold" style="border-radius: 6px;">
+                    1
+                </button>
+                <button class="btn btn-sm btn-outline-secondary px-2.5 py-1 disabled border-light-subtle bg-white text-secondary" style="border-radius: 6px;">
+                    <i class="bi bi-chevron-right small"></i>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

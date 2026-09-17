@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+
+{% block title %}Listening Processes{% endblock %}
+
+{% block content %}
+{% set processes = processes if (processes is defined and processes is not none) else [] %}
+{% set stats = stats if (stats is defined and stats is not none) else {
+    'total_processes': processes|length,
+    'total_listening_ports': (processes|map(attribute='count')|sum) if processes else 0,
+    'medium_risk_processes': (processes|selectattr('max_risk', 'equalto', 'MEDIUM')|list|length) if processes else 0,
+    'high_risk_processes': (processes|selectattr('max_risk', 'equalto', 'HIGH')|list|length) if processes else 0
+} %}
+{% set selected_host_id = selected_host_id if selected_host_id is defined else None %}
+{% set risk_filter = risk_filter if risk_filter is defined else '' %}
+{% set min_sockets = min_sockets if min_sockets is defined else None %}
+{% set search_query = search_query if search_query is defined else '' %}
+{% set per_page = per_page if per_page is defined else 10 %}
+{% set page = page if page is defined else 1 %}
+{% set total_pages = total_pages if total_pages is defined else 1 %}
+{% set total_count = total_count if total_count is defined else processes|length %}
+{% set start_index = start_index if start_index is defined else (1 if total_count > 0 else 0) %}
+{% set end_index = end_index if end_index is defined else processes|length %}
+{% set page_numbers = page_numbers if page_numbers is defined else [1] %}
+
+<!-- 1. Page Header matching screenshot -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+    <div>
+        <h2 class="ports-page-title mb-1">Listening Processes</h2>
+        <p class="ports-page-subtitle mb-0">Running operating system processes bound to network listening sockets.</p>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <!-- Top Right Host Selector Dropdown matching screenshot -->
+        <div class="dropdown">
+            <button class="btn processes-header-host-select dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                <i class="bi bi-display text-muted"></i>
+                <span>
+                    {% if selected_host_id %}
+                        {% for h in hosts if h.id == selected_host_id %}{{ h.name }}{% endfor %}
+                    {% else %}
+                        All Hosts
+                    {% endif %}
+                </span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                <li>
+                    <a class="dropdown-item {% if not selected_host_id %}active{% endif %}" href="{{ url_for('ports.processes', risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=per_page) }}">
+                        All Hosts
+                    </a>
+                </li>
+                {% for h in hosts %}
+                <li>
+                    <a class="dropdown-item {% if selected_host_id == h.id %}active{% endif %}" href="{{ url_for('ports.processes', host_id=h.id, risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=per_page) }}">
+                        {{ h.name }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Top Right Refresh Button matching screenshot -->
+        <a href="{{ url_for('ports.processes', host_id=selected_host_id, risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=per_page) }}" class="btn-header-refresh" title="Refresh">
+            <i class="bi bi-arrow-clockwise"></i>
+        </a>
+    </div>
+</div>
+
+<!-- 2. Four KPI Metric Cards matching screenshot -->
+<div class="ports-stats-grid mb-4">
+    <!-- Card 1: Total Processes -->
+    <div class="ports-stat-card">
+        <div class="stat-card-left">
+            <div class="stat-icon-wrapper stat-icon-blue">
+                <i class="bi bi-gear-fill"></i>
+            </div>
+            <div class="stat-card-text">
+                <div class="stat-value">{{ stats.total_processes }}</div>
+                <div class="stat-label">Total Processes</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Total Listening Ports -->
+    <div class="ports-stat-card">
+        <div class="stat-card-left">
+            <div class="stat-icon-wrapper stat-icon-green">
+                <i class="bi bi-share-fill"></i>
+            </div>
+            <div class="stat-card-text">
+                <div class="stat-value">{{ stats.total_listening_ports }}</div>
+                <div class="stat-label">Total Listening Ports</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Medium Risk Processes -->
+    <div class="ports-stat-card">
+        <div class="stat-card-left">
+            <div class="stat-icon-wrapper stat-icon-amber">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div class="stat-card-text">
+                <div class="stat-value">{{ stats.medium_risk_processes }}</div>
+                <div class="stat-label">Medium Risk Processes</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: High Risk Processes -->
+    <div class="ports-stat-card">
+        <div class="stat-card-left">
+            <div class="stat-icon-wrapper stat-icon-red">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+            </div>
+            <div class="stat-card-text">
+                <div class="stat-value">{{ stats.high_risk_processes }}</div>
+                <div class="stat-label">High Risk Processes</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Filter Bar matching screenshot -->
+<div class="process-filter-bar mb-4">
+    <form method="GET" action="{{ url_for('ports.processes') }}" class="row g-3 align-items-end">
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+
+        <!-- Host Filter -->
+        <div class="col-12 col-md-auto" style="min-width: 170px;">
+            <label class="filter-item-label">Host</label>
+            <select name="host_id" class="form-select filter-select-custom">
+                <option value="">All Hosts</option>
+                {% for h in hosts %}
+                <option value="{{ h.id }}" {% if selected_host_id == h.id %}selected{% endif %}>{{ h.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Risk Level Filter -->
+        <div class="col-12 col-md-auto" style="min-width: 170px;">
+            <label class="filter-item-label">Risk Level</label>
+            <select name="risk_level" class="form-select filter-select-custom">
+                <option value="">All Risk Levels</option>
+                <option value="HIGH" {% if risk_filter == 'HIGH' %}selected{% endif %}>High Risk</option>
+                <option value="MEDIUM" {% if risk_filter == 'MEDIUM' %}selected{% endif %}>Medium Risk</option>
+                <option value="LOW" {% if risk_filter == 'LOW' %}selected{% endif %}>Low Risk</option>
+            </select>
+        </div>
+
+        <!-- Min Sockets Filter -->
+        <div class="col-12 col-md-auto" style="min-width: 140px;">
+            <label class="filter-item-label">Min Sockets</label>
+            <select name="min_sockets" class="form-select filter-select-custom">
+                <option value="">All</option>
+                <option value="1" {% if min_sockets == 1 %}selected{% endif %}>1+</option>
+                <option value="2" {% if min_sockets == 2 %}selected{% endif %}>2+</option>
+                <option value="5" {% if min_sockets == 5 %}selected{% endif %}>5+</option>
+                <option value="10" {% if min_sockets == 10 %}selected{% endif %}>10+</option>
+            </select>
+        </div>
+
+        <!-- Search Input -->
+        <div class="col-12 col-md flex-grow-1">
+            <div class="search-input-wrap">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" name="q" class="search-input-custom" placeholder="Search process name, PID, port..." value="{{ search_query or '' }}">
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="col-12 col-md-auto d-flex align-items-center gap-2">
+            <button type="submit" class="btn-filter-apply">
+                <i class="bi bi-funnel-fill"></i> Filter
+            </button>
+            <a href="{{ url_for('ports.processes') }}" class="btn-filter-clear">
+                Clear
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- 4. Listening Processes Table Card matching screenshot -->
+<div class="table-processes-card">
+    {% if not processes %}
+    <div class="empty-state py-5 text-center">
+        <div class="empty-state-icon text-muted mb-3"><i class="bi bi-cpu fs-1"></i></div>
+        <div class="empty-state-title fw-bold fs-5 text-dark">No Active Processes Bound to Ports</div>
+        <p class="empty-state-text text-secondary small mt-1">No listening processes matched your current filter criteria.</p>
+        <a href="{{ url_for('ports.processes') }}" class="btn btn-primary-soc mt-3">Reset All Filters</a>
+    </div>
+    {% else %}
+    <div class="table-responsive">
+        <table class="table-processes">
+            <thead>
+                <tr>
+                    <th>Process Name</th>
+                    <th>PID</th>
+                    <th>Host</th>
+                    <th>Bound Ports</th>
+                    <th>Sockets</th>
+                    <th>Risk Level</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in processes %}
+                {% set p_lower = (p.process_name or '').lower() %}
+                {% set p_first_snap = (p.snapshots[0] if (p.snapshots and p.snapshots|length > 0) else None) %}
+                {% set p_host_id = p.get('host_id') or (p_first_snap.host_id if p_first_snap else None) %}
+                {% set p_host_ip = p.get('host_ip') or (p_first_snap.host.ip_address if (p_first_snap and p_first_snap.host) else '127.0.0.1') %}
+                {% set p_snap_id = p.get('first_snapshot_id') or (p_first_snap.id if p_first_snap else None) %}
+                <tr>
+                    <!-- Process Name with Dedicated Brand / Category SVG Icon -->
+                    <td>
+                        <div class="proc-name-wrap">
+                            {% if 'chrome' in p_lower or 'chromium' in p_lower or 'browser' in p_lower %}
+                                <!-- Google Chrome Logo -->
+                                <div class="proc-icon-box proc-icon-chrome" title="Web Browser">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
+                                        <defs>
+                                            <linearGradient id="ch-red" x1="3.2173" y1="15" x2="44.7812" y2="15" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d93025"/><stop offset="1" stop-color="#ea4335"/></linearGradient>
+                                            <linearGradient id="ch-yel" x1="20.7219" y1="47.6791" x2="41.5039" y2="11.6837" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fcc934"/><stop offset="1" stop-color="#fbbc04"/></linearGradient>
+                                            <linearGradient id="ch-grn" x1="26.5981" y1="46.5015" x2="5.8161" y2="10.506" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1e8e3e"/><stop offset="1" stop-color="#34a853"/></linearGradient>
+                                        </defs>
+                                        <circle cx="24" cy="24" r="12" fill="#ffffff"/>
+                                        <path d="M24,12H44.7812a23.9939,23.9939,0,0,0-41.5639.0029L13.6079,30l.0093-.0024A11.9852,11.9852,0,0,1,24,12Z" fill="url(#ch-red)"/>
+                                        <circle cx="24" cy="24" r="9.5" fill="#1a73e8"/>
+                                        <path d="M34.3913,30.0029,24.0007,48A23.994,23.994,0,0,0,44.78,12.0031H23.9989l-.0025.0093A11.985,11.985,0,0,1,34.3913,30.0029Z" fill="url(#ch-yel)"/>
+                                        <path d="M13.6086,30.0031,3.218,12.006A23.994,23.994,0,0,0,24.0025,48L34.3931,30.0029l-.0067-.0068a11.9852,11.9852,0,0,1-20.7778.007Z" fill="url(#ch-grn)"/>
+                                    </svg>
+                                </div>
+                            {% elif 'svchost' in p_lower or 'crossdevice' in p_lower or 'wininit' in p_lower or 'system' in p_lower or 'lsass' in p_lower or 'explorer' in p_lower or 'smss' in p_lower or 'csrss' in p_lower or 'registry' in p_lower %}
+                                <!-- Windows Fluent 4-Square Logo -->
+                                <div class="proc-icon-box proc-icon-win" title="Windows System Service">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <rect x="2" y="2" width="9.2" height="9.2" rx="1.6" fill="#0078D4"/>
+                                        <rect x="12.8" y="2" width="9.2" height="9.2" rx="1.6" fill="#0078D4"/>
+                                        <rect x="2" y="12.8" width="9.2" height="9.2" rx="1.6" fill="#0078D4"/>
+                                        <rect x="12.8" y="12.8" width="9.2" height="9.2" rx="1.6" fill="#0078D4"/>
+                                    </svg>
+                                </div>
+                            {% elif 'python' in p_lower or 'uvicorn' in p_lower or 'gunicorn' in p_lower or 'flask' in p_lower %}
+                                <!-- Python Logo -->
+                                <div class="proc-icon-box proc-icon-python" title="Python Runtime">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <path d="M11.9 2C8.7 2 6.7 3.4 6.7 5.5V7.4H12.1V8.3H4.5C2.5 8.3 1 9.8 1 12.2C1 14.6 2.3 16 4.7 16H6.1V14.2C6.1 12.2 7.8 10.5 9.8 10.5H14.5C15.8 10.5 16.9 9.4 16.9 8.1V4.9C16.9 3.2 14.8 2 11.9 2ZM9.4 3.7C10 3.7 10.5 4.2 10.5 4.8C10.5 5.4 10 5.9 9.4 5.9C8.8 5.9 8.3 5.4 8.3 4.8C8.3 4.2 8.8 3.7 9.4 3.7Z" fill="#366994"/>
+                                        <path d="M12.1 22C15.3 22 17.3 20.6 17.3 18.5V16.6H11.9V15.7H19.5C21.5 15.7 23 14.2 23 11.8C23 9.4 21.7 8 19.3 8H17.9V9.8C17.9 11.8 16.2 13.5 14.2 13.5H9.5C8.2 13.5 7.1 14.6 7.1 15.9V19.1C7.1 20.8 9.2 22 12.1 22ZM14.6 20.3C14 20.3 13.5 19.8 13.5 19.2C13.5 18.6 14 18.1 14.6 18.1C15.2 18.1 15.7 18.6 15.7 19.2C15.7 19.8 15.2 20.3 14.6 20.3Z" fill="#FFC331"/>
+                                    </svg>
+                                </div>
+                            {% elif 'spotify' in p_lower %}
+                                <!-- Spotify Logo -->
+                                <div class="proc-icon-box proc-icon-spotify" title="Spotify Media">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="11" fill="#1DB954"/>
+                                        <path d="M16.8 15.6C16.5 16 16 16.1 15.6 15.9C13.2 14.5 10.1 14.1 6.4 15C6 15.1 5.5 14.8 5.4 14.4C5.3 14 5.6 13.5 6 13.4C10.1 12.4 13.6 12.9 16.3 14.6C16.7 14.8 16.9 15.2 16.8 15.6ZM18.1 12.8C17.8 13.3 17.2 13.5 16.7 13.2C13.9 11.4 9.6 10.9 6.2 12C5.6 12.2 5 11.8 4.8 11.2C4.6 10.6 5 10 5.6 9.8C9.6 8.6 14.4 9.1 17.6 11.1C18.1 11.4 18.3 12.1 18.1 12.8ZM18.3 9.9C15 8 9.2 7.8 5.7 8.9C5.1 9.1 4.4 8.7 4.2 8.1C4 7.5 4.4 6.8 5 6.6C9.2 5.3 15.5 5.6 19.4 7.9C20 8.2 20.2 9 19.8 9.6C19.5 10.2 18.8 10.3 18.3 9.9Z" fill="#FFFFFF"/>
+                                    </svg>
+                                </div>
+                            {% elif 'antigravity' in p_lower %}
+                                <!-- Antigravity IDE Icon -->
+                                <div class="proc-icon-box proc-icon-code" title="Antigravity IDE">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 3L3 19H21L12 3Z" stroke="#38BDF8" stroke-width="2.2" stroke-linejoin="round"/>
+                                        <path d="M7.5 14.5H16.5" stroke="#818CF8" stroke-width="2.2" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            {% elif 'code' in p_lower or 'language_server' in p_lower or 'node' in p_lower or 'deno' in p_lower or 'bun' in p_lower %}
+                                <!-- Dev / Code Tooling Icon -->
+                                <div class="proc-icon-box proc-icon-code" title="Developer Runtime / Editor">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                                        <path d="M16 18L22 12L16 6" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M8 6L2 12L8 18" stroke="#38BDF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M14 4L10 20" stroke="#818CF8" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            {% elif 'vmware' in p_lower or 'vmnat' in p_lower or 'vmnet' in p_lower or 'vbox' in p_lower or 'virtual' in p_lower or 'docker' in p_lower or 'containerd' in p_lower %}
+                                <!-- Virtualization / VMware Icon -->
+                                <div class="proc-icon-box proc-icon-vmware" title="Virtualization Service">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <rect x="2" y="2" width="9" height="9" rx="2" fill="#0284C7"/>
+                                        <rect x="13" y="2" width="9" height="9" rx="2" fill="#38BDF8"/>
+                                        <rect x="2" y="13" width="9" height="9" rx="2" fill="#0369A1"/>
+                                        <rect x="13" y="13" width="9" height="9" rx="2" fill="#0284C7"/>
+                                    </svg>
+                                </div>
+                            {% elif 'teams' in p_lower or 'slack' in p_lower or 'discord' in p_lower or 'zoom' in p_lower %}
+                                <!-- Teams / Communication Icon -->
+                                <div class="proc-icon-box proc-icon-teams" title="Communication App">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <path d="M15.5 8C15.5 8.8 14.8 9.5 14 9.5C13.2 9.5 12.5 8.8 12.5 8C12.5 7.2 13.2 6.5 14 6.5C14.8 6.5 15.5 7.2 15.5 8ZM17 11.5H13.5C12.7 11.5 12 12.2 12 13V14.5H18.5V13C18.5 12.2 17.8 11.5 17 11.5Z" fill="#7C88DE"/>
+                                        <rect x="3.5" y="6.5" width="10" height="11" rx="2" fill="#5059C9"/>
+                                        <path d="M6 9.5H11M8.5 9.5V14.5" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            {% elif 'nessus' in p_lower or 'wireshark' in p_lower or 'nmap' in p_lower or 'snort' in p_lower or 'defender' in p_lower or 'security' in p_lower %}
+                                <!-- Security / Scanner Icon -->
+                                <div class="proc-icon-box proc-icon-security" title="Security / Network Scanner">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 2L4 5.5V11.5C4 16.5 7.4 21.2 12 22.5C16.6 21.2 20 16.5 20 11.5V5.5L12 2Z" fill="#0EA5E9" fill-opacity="0.15" stroke="#0284C7" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <circle cx="12" cy="11" r="2.8" fill="#0284C7"/>
+                                        <path d="M12 6.5V8M12 14V15.5M7.5 11H9M15 11H16.5" stroke="#0284C7" stroke-width="1.8" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            {% elif 'kfsnserv' in p_lower or 'kfmond' in p_lower or 'spoolsv' in p_lower or 'services' in p_lower or 'daemon' in p_lower or 'server' in p_lower or 'nginx' in p_lower or 'httpd' in p_lower or 'apache' in p_lower %}
+                                <!-- Server Daemon / Background Network Service -->
+                                <div class="proc-icon-box proc-icon-daemon" title="Network Service Daemon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <rect x="3" y="4" width="18" height="6.5" rx="2" fill="#F8FAFC" stroke="#475569" stroke-width="1.6"/>
+                                        <rect x="3" y="13.5" width="18" height="6.5" rx="2" fill="#F8FAFC" stroke="#475569" stroke-width="1.6"/>
+                                        <circle cx="6.5" cy="7.25" r="1.2" fill="#10B981"/>
+                                        <circle cx="6.5" cy="16.75" r="1.2" fill="#3B82F6"/>
+                                        <line x1="14" y1="7.25" x2="17.5" y2="7.25" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+                                        <line x1="14" y1="16.75" x2="17.5" y2="16.75" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            {% elif 'sql' in p_lower or 'mongo' in p_lower or 'redis' in p_lower or 'postgres' in p_lower or 'database' in p_lower %}
+                                <!-- Database Service Icon -->
+                                <div class="proc-icon-box proc-icon-db" title="Database Service">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <ellipse cx="12" cy="5.5" rx="8" ry="3.5" stroke="#9333EA" stroke-width="1.7"/>
+                                        <path d="M4 5.5V12C4 13.9 7.6 15.5 12 15.5C16.4 15.5 20 13.9 20 12V5.5" stroke="#9333EA" stroke-width="1.7"/>
+                                        <path d="M4 12V18.5C4 20.4 7.6 22 12 22C16.4 22 20 20.4 20 18.5V12" stroke="#9333EA" stroke-width="1.7"/>
+                                    </svg>
+                                </div>
+                            {% else %}
+                                <!-- Modern Microchip / Generic Process Fallback -->
+                                <div class="proc-icon-box proc-icon-default" title="System Process">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <rect x="5" y="5" width="14" height="14" rx="2.5" fill="#F8FAFC" stroke="#64748B" stroke-width="1.6"/>
+                                        <rect x="8.5" y="8.5" width="7" height="7" rx="1.2" fill="#64748B" fill-opacity="0.18" stroke="#64748B" stroke-width="1.3"/>
+                                        <path d="M9 2V5M15 2V5M9 19V22M15 19V22M2 9H5M2 15H5M19 9H22M19 15H22" stroke="#64748B" stroke-width="1.5" stroke-linecap="round"/>
+                                    </svg>
+                                </div>
+                            {% endif %}
+                            <span class="proc-name-text">{{ p.process_name }}</span>
+                        </div>
+                    </td>
+
+                    <!-- PID -->
+                    <td>
+                        <span class="pid-badge">{{ p.pid or 'N/A' }}</span>
+                    </td>
+
+                    <!-- Host Name and IP -->
+                    <td>
+                        <div class="host-cell-title">{{ p.host_name }}</div>
+                        <div class="host-cell-sub">({{ p_host_ip }})</div>
+                    </td>
+
+                    <!-- Bound Ports Chips with +N Overflow Badge -->
+                    <td>
+                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                            {% for pt in p.ports[:3] %}
+                                <a href="{{ url_for('ports.index', host_id=p_host_id, search=pt.split('/')[0]) if p_host_id else url_for('ports.index', search=pt.split('/')[0]) }}" class="port-chip" title="Inspect Port {{ pt }}">
+                                    {{ pt }}
+                                </a>
+                            {% endfor %}
+                            {% if p.ports|length > 3 %}
+                                <span class="port-chip port-chip-more" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ p.ports[3:]|join(', ') }}">
+                                    +{{ p.ports|length - 3 }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Sockets Count -->
+                    <td>
+                        <span class="sockets-pill">{{ p.count }}</span>
+                    </td>
+
+                    <!-- Risk Level Pill matching screenshot -->
+                    <td>
+                        {% if p.max_risk == 'HIGH' %}
+                            <span class="risk-badge risk-badge-high"><i class="bi bi-exclamation-triangle-fill"></i> HIGH</span>
+                        {% elif p.max_risk == 'MEDIUM' %}
+                            <span class="risk-badge risk-badge-med"><i class="bi bi-exclamation-circle-fill"></i> MEDIUM</span>
+                        {% else %}
+                            <span class="risk-badge risk-badge-low"><i class="bi bi-check-circle-fill"></i> LOW</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Action: View Button & Three Dots Kebab Menu matching screenshot -->
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{{ url_for('ports.detail', snapshot_id=p_snap_id) if p_snap_id else (url_for('ports.index', host_id=p_host_id) if p_host_id else url_for('ports.index')) }}" class="btn-action-view">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                            <div class="dropdown">
+                                <button class="btn-action-kebab dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 small">
+                                    <li><a class="dropdown-item" href="{{ url_for('hosts.detail', host_id=p_host_id) if p_host_id else url_for('hosts.index') }}"><i class="bi bi-display me-2 text-muted"></i>Host Overview</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('ports.index', host_id=p_host_id) if p_host_id else url_for('ports.index') }}"><i class="bi bi-diagram-3 me-2 text-muted"></i>All Host Ports</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('alerts.index', host_id=p_host_id) if p_host_id else url_for('alerts.index') }}"><i class="bi bi-exclamation-triangle me-2 text-muted"></i>Host Alerts</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ p.process_name }}'); if (typeof showToast === 'function') showToast('Copied {{ p.process_name }} to clipboard', 'info');"><i class="bi bi-clipboard me-2 text-muted"></i>Copy Process Name</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 5. Table Footer: Pagination and Rows Per Page matching screenshot -->
+    <div class="table-processes-footer d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
+        <div class="text-secondary small">
+            Showing {{ start_index }} to {{ end_index }} of {{ total_count }} processes
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+            <!-- Pagination Controls -->
+            {% if total_pages > 1 %}
+            <nav aria-label="Process pagination">
+                <div class="pagination-custom d-flex align-items-center gap-1">
+                    <a href="{{ url_for('ports.processes', page=page-1, host_id=selected_host_id, risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=per_page) }}" 
+                       class="page-nav-btn page-arrow-btn {% if page <= 1 %}disabled{% endif %}" aria-label="Previous">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+
+                    {% for p_num in page_numbers %}
+                        {% if p_num == '...' %}
+                            <span class="page-ellipsis-item">&hellip;</span>
+                        {% else %}
+                            <a href="{{ url_for('ports.processes', page=p_num, host_id=selected_host_id, risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=per_page) }}"
+                               class="page-nav-btn {% if p_num == page %}active{% endif %}">
+                                {{ p_num }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    <a href="{{ url_for('ports.processes', page=page+1, host_id=selected_host_id, risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=per_page) }}"
+                       class="page-nav-btn page-arrow-btn {% if page >= total_pages %}disabled{% endif %}" aria-label="Next">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </div>
+            </nav>
+            {% endif %}
+
+            <!-- Rows Per Page Dropdown -->
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-secondary small text-nowrap">Rows per page</span>
+                <select class="form-select form-select-sm" style="width: 75px; height: 32px; border-radius: 6px; font-size: 0.8rem;" onchange="window.location.href = this.value;">
+                    {% for count in [5, 8, 10, 20, 25, 50] %}
+                    <option value="{{ url_for('ports.processes', page=1, host_id=selected_host_id, risk_level=risk_filter, min_sockets=min_sockets, q=search_query, per_page=count) }}" {% if per_page == count %}selected{% endif %}>
+                        {{ count }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize tooltips for overflow port badges
+    document.addEventListener('DOMContentLoaded', () => {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

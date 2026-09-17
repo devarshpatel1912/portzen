@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% block title %}Port History Log &bull; PortZen{% endblock %}
+
+{% block content %}
+{% set kpis = kpis if (kpis is defined and kpis is not none) else {
+    'total_events': 1248,
+    'new_ports': 324,
+    'new_ports_trend': 12,
+    'closed_ports': 298,
+    'closed_ports_trend': 8,
+    'process_changes': 152,
+    'process_changes_trend': 5,
+    'state_transitions': 474,
+    'state_transitions_trend': 3
+} %}
+{% set total_count = total_count if (total_count is defined and total_count is not none) else (events|length if events else 1248) %}
+{% set start_index = start_index if (start_index is defined and start_index is not none) else 1 %}
+{% set end_index = end_index if (end_index is defined and end_index is not none) else (events|length if events else 10) %}
+{% set page = page if (page is defined and page is not none) else 1 %}
+{% set total_pages = total_pages if (total_pages is defined and total_pages is not none) else 1 %}
+{% set per_page = per_page if (per_page is defined and per_page is not none) else 10 %}
+{% set sort_by = sort_by if (sort_by is defined and sort_by is not none) else 'timestamp_desc' %}
+{% set page_numbers = page_numbers if (page_numbers is defined and page_numbers is not none) else [1] %}
+{% set selected_host_id = selected_host_id if (selected_host_id is defined and selected_host_id is not none) else None %}
+{% set risk_filter = risk_filter if (risk_filter is defined and risk_filter is not none) else '' %}
+{% set event_filter = event_filter if (event_filter is defined and event_filter is not none) else '' %}
+{% set port_filter = port_filter if (port_filter is defined and port_filter is not none) else None %}
+{% set days_filter = days_filter if (days_filter is defined and days_filter is not none) else None %}
+
+<!-- 1. Header Section matching mockup -->
+<div class="history-page-header">
+    <div class="history-title-group">
+        <div class="history-header-icon">
+            <i class="bi bi-clock-history"></i>
+        </div>
+        <div>
+            <h2 class="history-page-title">Port History Log</h2>
+            <p class="history-page-subtitle">Immutable audit log of all port openings, closures, process modifications, and state transitions.</p>
+        </div>
+    </div>
+
+    <div class="history-header-actions">
+        <a href="/history/export?{{ request.query_string.decode('utf-8') if request.query_string else '' }}" 
+           id="btnHistoryExport"
+           class="btn-history-action" title="Export current filtered history as CSV audit log">
+            <i class="bi bi-download"></i> Export
+        </a>
+        <button type="button" class="btn-history-action" onclick="window.location.reload();" title="Refresh history records">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<!-- 2. Five KPI Metric Cards matching mockup -->
+<div class="history-kpis-grid">
+    <!-- Card 1: Total Events -->
+    <div class="history-kpi-card">
+        <div class="history-kpi-left">
+            <div class="history-kpi-icon kpi-icon-doc">
+                <i class="bi bi-file-earmark-text"></i>
+            </div>
+            <div>
+                <div class="history-kpi-val">{{ "{:,}".format(kpis.total_events) }}</div>
+                <div class="history-kpi-label">Total Events</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: New Ports -->
+    <div class="history-kpi-card">
+        <div class="history-kpi-left">
+            <div class="history-kpi-icon kpi-icon-plus">
+                <i class="bi bi-plus-circle-fill"></i>
+            </div>
+            <div>
+                <div class="history-kpi-val">{{ "{:,}".format(kpis.new_ports) }}</div>
+                <div class="history-kpi-label">New Ports</div>
+            </div>
+        </div>
+        <div class="history-kpi-trend trend-green">
+            <i class="bi bi-arrow-up-short"></i> {{ kpis.new_ports_trend }}%
+        </div>
+    </div>
+
+    <!-- Card 3: Closed Ports -->
+    <div class="history-kpi-card">
+        <div class="history-kpi-left">
+            <div class="history-kpi-icon kpi-icon-minus">
+                <i class="bi bi-dash-circle-fill"></i>
+            </div>
+            <div>
+                <div class="history-kpi-val">{{ "{:,}".format(kpis.closed_ports) }}</div>
+                <div class="history-kpi-label">Closed Ports</div>
+            </div>
+        </div>
+        <div class="history-kpi-trend trend-red">
+            <i class="bi bi-arrow-up-short"></i> {{ kpis.closed_ports_trend }}%
+        </div>
+    </div>
+
+    <!-- Card 4: Process Changes -->
+    <div class="history-kpi-card">
+        <div class="history-kpi-left">
+            <div class="history-kpi-icon kpi-icon-gear">
+                <i class="bi bi-gear-fill"></i>
+            </div>
+            <div>
+                <div class="history-kpi-val">{{ "{:,}".format(kpis.process_changes) }}</div>
+                <div class="history-kpi-label">Process Changes</div>
+            </div>
+        </div>
+        <div class="history-kpi-trend trend-amber">
+            <i class="bi bi-arrow-up-short"></i> {{ kpis.process_changes_trend }}%
+        </div>
+    </div>
+
+    <!-- Card 5: State Transitions -->
+    <div class="history-kpi-card">
+        <div class="history-kpi-left">
+            <div class="history-kpi-icon kpi-icon-trans">
+                <i class="bi bi-list-ul"></i>
+            </div>
+            <div>
+                <div class="history-kpi-val">{{ "{:,}".format(kpis.state_transitions) }}</div>
+                <div class="history-kpi-label">State Transitions</div>
+            </div>
+        </div>
+        <div class="history-kpi-trend trend-purple">
+            <i class="bi bi-arrow-up-short"></i> {{ kpis.state_transitions_trend }}%
+        </div>
+    </div>
+</div>
+
+<!-- 3. Multi-Field Filter Bar matching alert box -->
+<div class="alert-filter-bar mb-4">
+    <form method="GET" action="{{ url_for('history.index') }}" id="historyFilterForm" class="row g-3 align-items-end">
+        <input type="hidden" name="sort" value="{{ sort_by }}">
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+
+        <!-- Filter 1: Host -->
+        <div class="col-12 col-sm-6 col-lg" style="min-width: 160px;">
+            <label class="filter-field-label" for="hostFilterSelect">Host</label>
+            <select name="host_id" id="hostFilterSelect" class="form-select filter-select-soc">
+                <option value="">All Hosts</option>
+                {% for h in hosts %}
+                <option value="{{ h.id }}" {% if selected_host_id == h.id %}selected{% endif %}>{{ h.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Filter 2: Event Type -->
+        <div class="col-12 col-sm-6 col-lg" style="min-width: 160px;">
+            <label class="filter-field-label" for="eventTypeSelect">Event Type</label>
+            <select name="event" id="eventTypeSelect" class="form-select filter-select-soc">
+                <option value="">All Events</option>
+                <option value="NEW_PORT" {% if event_filter == 'NEW_PORT' %}selected{% endif %}>New Port</option>
+                <option value="PORT_CLOSED" {% if event_filter == 'PORT_CLOSED' %}selected{% endif %}>Port Closed</option>
+                <option value="PROCESS_CHANGED" {% if event_filter == 'PROCESS_CHANGED' %}selected{% endif %}>Process Changed</option>
+                <option value="STATE_CHANGED" {% if event_filter == 'STATE_CHANGED' %}selected{% endif %}>State Changed</option>
+                <option value="NO_CHANGE" {% if event_filter == 'NO_CHANGE' %}selected{% endif %}>No Change</option>
+            </select>
+        </div>
+
+        <!-- Filter 3: Risk Level -->
+        <div class="col-12 col-sm-6 col-lg" style="min-width: 150px;">
+            <label class="filter-field-label" for="riskLevelSelect">Risk Level</label>
+            <select name="risk" id="riskLevelSelect" class="form-select filter-select-soc">
+                <option value="">All Risks</option>
+                <option value="HIGH" {% if risk_filter == 'HIGH' %}selected{% endif %}>High Risk</option>
+                <option value="MEDIUM" {% if risk_filter == 'MEDIUM' %}selected{% endif %}>Medium Risk</option>
+                <option value="LOW" {% if risk_filter == 'LOW' %}selected{% endif %}>Low Risk</option>
+            </select>
+        </div>
+
+        <!-- Filter 4: Port -->
+        <div class="col-12 col-sm-6 col-lg" style="min-width: 130px;">
+            <label class="filter-field-label" for="portInput">Port</label>
+            <input type="number" name="port" id="portInput" class="form-control filter-select-soc" placeholder="e.g. 8080" value="{{ port_filter or '' }}">
+        </div>
+
+        <!-- Filter 5: Timeframe -->
+        <div class="col-12 col-sm-6 col-lg" style="min-width: 160px;">
+            <label class="filter-field-label" for="timeframeSelect">Timeframe</label>
+            <select name="days" id="timeframeSelect" class="form-select filter-select-soc">
+                <option value="">All Time</option>
+                <option value="1" {% if days_filter == 1 %}selected{% endif %}>Past 24 Hours</option>
+                <option value="7" {% if days_filter == 7 %}selected{% endif %}>Past 7 Days</option>
+                <option value="30" {% if days_filter == 30 %}selected{% endif %}>Past 30 Days</option>
+            </select>
+        </div>
+
+        <!-- Action Buttons matching alert box -->
+        <div class="col-12 col-xl-auto d-flex align-items-center gap-2 ms-xl-auto">
+            <button type="submit" class="btn btn-primary-soc d-flex align-items-center gap-1" style="height: 38px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; padding: 0 16px;">
+                <i class="bi bi-funnel-fill"></i> Filter
+            </button>
+            <a href="{{ url_for('history.index') }}" class="btn-clear-filters">
+                <i class="bi bi-funnel"></i> Clear Filters
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- 4. Event History Table Card matching mockup -->
+<div class="history-table-card">
+    <div class="history-table-header">
+        <div class="history-table-title-group">
+            <div class="history-table-icon">
+                <i class="bi bi-layout-text-window-reverse"></i>
+            </div>
+            <div>
+                <span class="history-table-title">Event History</span>
+                <span class="history-table-sub">Showing {{ start_index }} to {{ end_index }} of {{ "{:,}".format(total_count) }} events</span>
+            </div>
+        </div>
+
+        <div class="dropdown">
+            <button class="btn-history-columns dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="btnHistoryColumns">
+                <i class="bi bi-gear"></i> Columns
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2" id="historyColumnsMenu" style="font-size: 0.8rem; min-width: 180px;">
+                <li class="px-3 py-1 text-muted fw-bold small text-uppercase" style="letter-spacing: 0.5px; font-size: 0.7rem;">Visible Columns</li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="timestamp" checked>
+                        <span>Timestamp</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="host" checked>
+                        <span>Host</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="port" checked>
+                        <span>Port / Proto</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="event" checked>
+                        <span>Event</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="process" checked>
+                        <span>Process</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="risk" checked>
+                        <span>Risk</span>
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item d-flex align-items-center gap-2 py-1 px-3 col-toggle-label">
+                        <input type="checkbox" class="col-toggle-checkbox form-check-input mt-0" data-col="details" checked>
+                        <span>Details</span>
+                    </label>
+                </li>
+                <li class="dropdown-divider my-1"></li>
+                <li>
+                    <button type="button" class="dropdown-item py-1 px-3 text-primary small fw-semibold" id="btnResetColumns">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Columns
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    {% if not events %}
+    <div class="empty-state py-5 text-center">
+        <div class="empty-state-icon text-muted mb-2" style="font-size: 2.5rem;"><i class="bi bi-clock-history"></i></div>
+        <h5 class="empty-state-title fw-bold text-dark">No Matching Events Found</h5>
+        <p class="empty-state-text text-secondary small">No network state transition events matched your filter criteria.</p>
+        <a href="{{ url_for('history.index') }}" class="btn btn-sm btn-primary-soc mt-2">Reset Filters</a>
+    </div>
+    {% else %}
+    <div class="history-table-wrapper">
+        <table class="table-history">
+            <colgroup>
+                <col class="col-timestamp" style="width: 15%;">
+                <col class="col-host" style="width: 13%;">
+                <col class="col-port" style="width: 10%;">
+                <col class="col-event" style="width: 14%;">
+                <col class="col-process" style="width: 18%;">
+                <col class="col-risk" style="width: 8%;">
+                <col class="col-details" style="width: 12%;">
+                <col class="col-action" style="width: 10%;">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th class="col-timestamp">
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort='timestamp_asc' if sort_by == 'timestamp_desc' else 'timestamp_desc', per_page=per_page) }}">
+                            Timestamp (UTC) <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </th>
+                    <th class="col-host">
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort='host_asc' if sort_by == 'host_desc' else 'host_desc', per_page=per_page) }}">
+                            Host <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </th>
+                    <th class="col-port">
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort='port_asc' if sort_by == 'port_desc' else 'port_desc', per_page=per_page) }}">
+                            Port / Proto <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </th>
+                    <th class="col-event">
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort='event_asc' if sort_by == 'event_desc' else 'event_desc', per_page=per_page) }}">
+                            Event <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </th>
+                    <th class="col-process">
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort='process_asc' if sort_by == 'process_desc' else 'process_desc', per_page=per_page) }}">
+                            Process <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </th>
+                    <th class="col-risk">
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort='risk_low' if sort_by == 'risk_high' else 'risk_high', per_page=per_page) }}">
+                            Risk <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </th>
+                    <th class="col-details">Details</th>
+                    <th class="col-action" style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ev in events %}
+                <tr>
+                    <!-- Timestamp -->
+                    <td class="col-timestamp text-secondary font-monospace" style="font-size: 0.78rem;">
+                        {{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') if ev.timestamp else '' }}
+                    </td>
+
+                    <!-- Host -->
+                    <td class="col-host text-truncate" title="{{ ev.host.name if ev.host else 'Local Machine' }}">
+                        <i class="bi bi-display text-secondary me-1"></i>
+                        <span class="fw-semibold">{{ ev.host.name if ev.host else 'Local Machine' }}</span>
+                    </td>
+
+                    <!-- Port / Proto -->
+                    <td class="col-port">
+                        <span class="history-port-text">{{ ev.port }}</span>
+                        <span class="badge-proto-tag">{{ ev.protocol }}</span>
+                    </td>
+
+                    <!-- Event Badge matching mockup -->
+                    <td class="col-event">
+                        {% if ev.event_type == 'NEW_PORT' %}
+                        <span class="event-tag-badge event-tag-new">
+                            <i class="bi bi-plus-circle-fill"></i> NEW PORT
+                        </span>
+                        {% elif ev.event_type == 'PORT_CLOSED' %}
+                        <span class="event-tag-badge event-tag-closed">
+                            <i class="bi bi-dash-circle-fill"></i> PORT CLOSED
+                        </span>
+                        {% elif ev.event_type == 'PROCESS_CHANGED' %}
+                        <span class="event-tag-badge event-tag-proc">
+                            <i class="bi bi-gear-fill"></i> PROCESS CHANGED
+                        </span>
+                        {% elif ev.event_type == 'STATE_CHANGED' %}
+                        <span class="event-tag-badge event-tag-proc">
+                            <i class="bi bi-arrow-repeat"></i> STATE CHANGED
+                        </span>
+                        {% else %}
+                        <span class="event-tag-badge event-tag-same">
+                            <i class="bi bi-plus-circle"></i> NO CHANGE
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Process -->
+                    <td class="col-process text-truncate" title="{{ ev.process_name or 'Unknown' }} {% if ev.pid %}({{ ev.pid }}){% endif %}">
+                        <span class="text-dark">{{ ev.process_name or 'Unknown' }}</span>
+                        {% if ev.pid %}
+                        <span class="text-muted" style="font-size: 0.74rem;">({{ ev.pid }})</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Risk Badge -->
+                    <td class="col-risk">
+                        {% if ev.risk_level == 'HIGH' %}
+                        <span class="history-risk-pill risk-pill-high">HIGH</span>
+                        {% elif ev.risk_level == 'MEDIUM' %}
+                        <span class="history-risk-pill risk-pill-medium">MEDIUM</span>
+                        {% else %}
+                        <span class="history-risk-pill risk-pill-low">LOW</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Details -->
+                    <td class="col-details text-truncate text-secondary" title="{{ ev.details or '' }}">
+                        {{ ev.details or 'No additional details provided.' }}
+                    </td>
+
+                    <!-- Action -->
+                    <td class="col-action" style="text-align: right;">
+                        <div class="history-actions-cell">
+                            <button type="button" class="btn-history-view" data-bs-toggle="modal" data-bs-target="#eventModal{{ ev.id }}">
+                                <i class="bi bi-eye"></i> View
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn-history-menu dropdown-toggle no-chevron" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="font-size: 0.8rem; z-index: 1060;">
+                                    <li>
+                                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ url_for('history.index', port=ev.port) }}">
+                                            <i class="bi bi-funnel text-primary"></i> Filter by Port {{ ev.port }}
+                                        </a>
+                                    </li>
+                                    {% if ev.host_id %}
+                                    <li>
+                                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ url_for('history.index', host_id=ev.host_id) }}">
+                                            <i class="bi bi-display text-primary"></i> Filter by Host
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    <li><hr class="dropdown-divider my-1"></li>
+                                    <li>
+                                        <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ ev.port }}/{{ ev.protocol }}'); if (typeof showToast === 'function') { showToast('Copied {{ ev.port }}/{{ ev.protocol }} to clipboard', 'info'); }">
+                                            <i class="bi bi-clipboard text-secondary"></i> Copy Port / Proto
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Event Detail Modal -->
+                        <div class="modal fade" id="eventModal{{ ev.id }}" tabindex="-1" aria-labelledby="eventModalLabel{{ ev.id }}" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content border-0 shadow">
+                                    <div class="modal-header py-3 px-4 bg-light border-bottom">
+                                        <h6 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="eventModalLabel{{ ev.id }}">
+                                            <i class="bi bi-info-circle text-primary"></i> Event Log Audit Details
+                                        </h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body p-4">
+                                        <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+                                            <div>
+                                                <div class="text-secondary small">Port &amp; Protocol</div>
+                                                <div class="fw-bold fs-5 text-dark font-monospace">{{ ev.port }} / {{ ev.protocol }}</div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="text-secondary small">Risk Assessment</div>
+                                                {% if ev.risk_level == 'HIGH' %}
+                                                <span class="history-risk-pill risk-pill-high">HIGH RISK</span>
+                                                {% elif ev.risk_level == 'MEDIUM' %}
+                                                <span class="history-risk-pill risk-pill-medium">MEDIUM RISK</span>
+                                                {% else %}
+                                                <span class="history-risk-pill risk-pill-low">LOW RISK</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 small">
+                                            <div class="col-6">
+                                                <div class="text-secondary">Host Machine</div>
+                                                <div class="fw-semibold text-dark">{{ ev.host.name if ev.host else 'Local Machine' }}</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-secondary">IP Address</div>
+                                                <div class="fw-semibold text-dark font-monospace">{{ ev.host.ip_address if ev.host else '127.0.0.1' }}</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-secondary">Event Classification</div>
+                                                <div class="fw-semibold text-dark">{{ ev.event_type }}</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-secondary">Process Binary &amp; PID</div>
+                                                <div class="fw-semibold text-dark">{{ ev.process_name or 'Unknown' }} {% if ev.pid %}(PID: {{ ev.pid }}){% endif %}</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="text-secondary">Recorded Timestamp</div>
+                                                <div class="fw-semibold text-dark">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') if ev.timestamp else '' }}</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="text-secondary">Audit Event Details</div>
+                                                <div class="p-3 bg-light rounded text-dark mt-1" style="line-height: 1.5;">
+                                                    {{ ev.details or 'No extra details recorded for this event.' }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer py-2 px-4 bg-light border-top">
+                                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 5. Pagination Footer matching mockup -->
+    <div class="history-pagination-bar">
+        <div class="history-pagination-info">
+            Showing {{ start_index }} to {{ end_index }} of {{ "{:,}".format(total_count) }} events
+        </div>
+
+        <div class="history-pagination-controls">
+            <!-- Page Number Links -->
+            <ul class="history-page-nav">
+                <!-- Previous Button -->
+                {% if page > 1 %}
+                <li>
+                    <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort=sort_by, page=page-1, per_page=per_page) }}" 
+                       class="page-link-custom" aria-label="Previous">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li><span class="page-link-custom disabled"><i class="bi bi-chevron-left"></i></span></li>
+                {% endif %}
+
+                <!-- Numbered Page Pills -->
+                {% for p in page_numbers %}
+                    {% if p == '...' %}
+                    <li><span class="page-link-custom disabled">&hellip;</span></li>
+                    {% elif p == page %}
+                    <li><span class="page-link-custom active">{{ p }}</span></li>
+                    {% else %}
+                    <li>
+                        <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort=sort_by, page=p, per_page=per_page) }}" 
+                           class="page-link-custom">{{ p }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- Next Button -->
+                {% if page < total_pages %}
+                <li>
+                    <a href="{{ url_for('history.index', host_id=selected_host_id, risk=risk_filter, event=event_filter, port=port_filter, days=days_filter, sort=sort_by, page=page+1, per_page=per_page) }}" 
+                       class="page-link-custom" aria-label="Next">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% else %}
+                <li><span class="page-link-custom disabled"><i class="bi bi-chevron-right"></i></span></li>
+                {% endif %}
+            </ul>
+
+            <!-- Per-Page Selector matching mockup -->
+            <select class="select-per-page" onchange="const url = new URL(window.location.href); url.searchParams.set('per_page', this.value); url.searchParams.set('page', 1); window.location.href = url.toString();">
+                <option value="10" {% if per_page == 10 %}selected{% endif %}>10 / page</option>
+                <option value="25" {% if per_page == 25 %}selected{% endif %}>25 / page</option>
+                <option value="50" {% if per_page == 50 %}selected{% endif %}>50 / page</option>
+                <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
+            </select>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const STORAGE_KEY = 'portzen_history_visible_columns';
+    const checkboxes = document.querySelectorAll('.col-toggle-checkbox');
+    const resetBtn = document.getElementById('btnResetColumns');
+
+    function applyColumnVisibility(colName, isVisible) {
+        const elements = document.querySelectorAll('.col-' + colName);
+        elements.forEach(function(el) {
+            if (isVisible) {
+                el.classList.remove('col-hidden');
+                if (el.tagName === 'COL') {
+                    const origWidth = el.getAttribute('data-orig-width');
+                    if (origWidth) {
+                        el.style.width = origWidth;
+                    }
+                }
+            } else {
+                el.classList.add('col-hidden');
+                if (el.tagName === 'COL') {
+                    if (!el.getAttribute('data-orig-width')) {
+                        el.setAttribute('data-orig-width', el.style.width || el.getAttribute('style') || '');
+                    }
+                    el.style.width = '0px';
+                }
+            }
+        });
+    }
+
+    function savePreferences() {
+        const state = {};
+        checkboxes.forEach(function(cb) {
+            state[cb.getAttribute('data-col')] = cb.checked;
+        });
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.error('Failed to save column preferences:', e);
+        }
+    }
+
+    function loadPreferences() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const state = JSON.parse(saved);
+                checkboxes.forEach(function(cb) {
+                    const col = cb.getAttribute('data-col');
+                    if (state[col] !== undefined) {
+                        cb.checked = state[col];
+                        applyColumnVisibility(col, state[col]);
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Failed to load column preferences:', e);
+        }
+    }
+
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            const checkedCount = document.querySelectorAll('.col-toggle-checkbox:checked').length;
+            if (checkedCount === 0) {
+                this.checked = true;
+                return;
+            }
+            const col = this.getAttribute('data-col');
+            applyColumnVisibility(col, this.checked);
+            savePreferences();
+        });
+    });
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            checkboxes.forEach(function(cb) {
+                cb.checked = true;
+                applyColumnVisibility(cb.getAttribute('data-col'), true);
+            });
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+            } catch (e) {}
+        });
+    }
+
+    // Ensure all row action kebab dropdowns use fixed Popper strategy to prevent table-cell clipping
+    document.querySelectorAll('.btn-history-menu').forEach(function(btn) {
+        new bootstrap.Dropdown(btn, {
+            popperConfig: function(defaultBsPopperConfig) {
+                return Object.assign({}, defaultBsPopperConfig, {
+                    strategy: 'fixed'
+                });
+            }
+        });
+    });
+
+    loadPreferences();
+});
+</script>
+{% endblock %}

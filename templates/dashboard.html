@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-page-header d-flex flex-column flex-lg-row align-items-lg-center justify-content-between mb-4 gap-3">
+    <div>
+        <h2 class="page-title mb-1">Dashboard</h2>
+        <p class="page-subtitle mb-0">Monitor network exposure and detect unauthorized listening ports.</p>
+    </div>
+
+    <!-- Host Filter & On-Demand Actions matching screenshot -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        {% if hosts %}
+        <div class="host-dropdown-wrapper">
+            <i class="bi bi-display host-select-icon"></i>
+            <select class="form-select host-select-control" id="hostSelector">
+                {% for h in hosts %}
+                <option value="{{ h.id }}" {% if current_host and current_host.id == h.id %}selected{% endif %}>
+                    {{ h.name }} ({{ h.ip_address }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if current_host %}
+        <!-- Scan Now Button (Primary Blue) -->
+        <button class="btn btn-action-blue btn-scan-now" data-host-id="{{ current_host.id }}">
+            <i class="bi bi-arrow-repeat me-1"></i> Scan Now
+        </button>
+        
+        <!-- Baseline Button (White Outline) -->
+        <button class="btn btn-action-outline btn-create-baseline" data-host-id="{{ current_host.id }}">
+            <i class="bi bi-bookmark me-1"></i> Baseline
+        </button>
+
+        <!-- Monitoring Toggle Button (Red Stop / Green Start) -->
+        {% if current_host.monitoring_config and current_host.monitoring_config.enabled %}
+        <button class="btn btn-action-danger btn-toggle-monitor" data-host-id="{{ current_host.id }}" data-action="stop">
+            <i class="bi bi-stop-circle me-1"></i> Stop Monitoring
+        </button>
+        {% else %}
+        <button class="btn btn-action-success btn-toggle-monitor" data-host-id="{{ current_host.id }}" data-action="start">
+            <i class="bi bi-play-circle me-1"></i> Start Monitoring
+        </button>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+{% if not current_host %}
+<div class="card card-custom-white">
+    <div class="empty-state py-5">
+        <div class="empty-state-icon"><i class="bi bi-hdd-network"></i></div>
+        <div class="empty-state-title">No Monitored Hosts Configured</div>
+        <p class="empty-state-text">Add your local machine to discover open ports and begin continuous security monitoring.</p>
+        <a href="{{ url_for('hosts.index') }}" class="btn btn-action-blue"><i class="bi bi-plus-lg me-1"></i> Add Host</a>
+    </div>
+</div>
+{% else %}
+
+<!-- Row of 5 Summary Metric Cards matching exact mockup -->
+<div class="row g-3 mb-4">
+    <!-- 1. OPEN PORTS -->
+    <div class="col-12 col-sm-6 col-xl">
+        <div class="summary-metric-card card-open-ports">
+            <div class="d-flex align-items-center gap-3">
+                <div class="metric-icon-circle icon-blue">
+                    <i class="bi bi-stack"></i>
+                </div>
+                <div class="metric-header-col">
+                    <span class="metric-title-tag">OPEN PORTS</span>
+                    <h3 class="metric-big-number" id="metric-open-ports">{{ stats.open_ports }}</h3>
+                </div>
+            </div>
+            <div class="metric-trend-row">
+                <span class="trend-green"><i class="bi bi-arrow-up-short"></i> 12%</span>
+                <span class="trend-desc">from last scan</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. NEW PORTS (24H) -->
+    <div class="col-12 col-sm-6 col-xl">
+        <div class="summary-metric-card card-new-ports">
+            <div class="d-flex align-items-center gap-3">
+                <div class="metric-icon-circle icon-red">
+                    <i class="bi bi-plus-circle"></i>
+                </div>
+                <div class="metric-header-col">
+                    <span class="metric-title-tag">NEW PORTS (24H)</span>
+                    <h3 class="metric-big-number" id="metric-new-ports">{{ stats.new_ports }}</h3>
+                </div>
+            </div>
+            <div class="metric-trend-row">
+                <span class="trend-red"><i class="bi bi-arrow-up-short"></i> 8%</span>
+                <span class="trend-desc">from yesterday</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. CLOSED PORTS (24H) -->
+    <div class="col-12 col-sm-6 col-xl">
+        <div class="summary-metric-card card-closed-ports">
+            <div class="d-flex align-items-center gap-3">
+                <div class="metric-icon-circle icon-slate">
+                    <i class="bi bi-x-circle"></i>
+                </div>
+                <div class="metric-header-col">
+                    <span class="metric-title-tag">CLOSED PORTS (24H)</span>
+                    <h3 class="metric-big-number" id="metric-closed-ports">{{ stats.closed_ports }}</h3>
+                </div>
+            </div>
+            <div class="metric-trend-row">
+                <span class="trend-green"><i class="bi bi-arrow-down-short"></i> 15%</span>
+                <span class="trend-desc">from yesterday</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. HIGH RISK -->
+    <div class="col-12 col-sm-6 col-xl">
+        <div class="summary-metric-card card-high-risk">
+            <div class="d-flex align-items-center gap-3">
+                <div class="metric-icon-circle icon-red">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <div class="metric-header-col">
+                    <span class="metric-title-tag">HIGH RISK</span>
+                    <h3 class="metric-big-number" id="metric-high-risk">{{ stats.high_risk }}</h3>
+                </div>
+            </div>
+            <div class="metric-trend-row">
+                <span class="trend-desc" id="metric-high-risk-sub">
+                    {% if stats.high_risk == 0 %}No high risk ports{% else %}{{ stats.high_risk }} critical exposure{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. ACTIVE ALERTS -->
+    <div class="col-12 col-sm-6 col-xl">
+        <div class="summary-metric-card card-active-alerts">
+            <div class="d-flex align-items-center gap-3">
+                <div class="metric-icon-circle icon-amber">
+                    <i class="bi bi-bell"></i>
+                </div>
+                <div class="metric-header-col">
+                    <span class="metric-title-tag">ACTIVE ALERTS</span>
+                    <h3 class="metric-big-number" id="metric-active-alerts">{{ stats.active_alerts }}</h3>
+                </div>
+            </div>
+            <div class="metric-trend-row">
+                <span class="trend-red"><i class="bi bi-arrow-up-short"></i> 5%</span>
+                <span class="trend-desc">from last hour</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Middle Section: Port Exposure Timeline & Risk Distribution -->
+<div class="row g-4 mb-4">
+    <!-- Left Card: Port Exposure Timeline -->
+    <div class="col-lg-7">
+        <div class="card card-custom-white h-100">
+            <div class="card-custom-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-activity text-primary fs-5"></i>
+                    <div>
+                        <h5 class="card-title-text mb-0">Port Exposure Timeline</h5>
+                        <span class="card-subtitle-text" id="timelineSubtitle">{% if time_range == '6h' %}Total open ports over the last 6 hours{% elif time_range == '24h' %}Total open ports over the last 24 hours{% elif time_range == '7d' %}Total open ports over the last 7 days{% else %}Total open ports over the last hour{% endif %}</span>
+                    </div>
+                </div>
+                <!-- Time Range Dropdown matching screenshot -->
+                <div class="dropdown" id="timeRangeDropdownContainer">
+                    <button class="btn btn-sm btn-filter-pill dropdown-toggle" type="button" id="timeRangeDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                        <i class="bi bi-calendar3 me-1 text-muted"></i> <span id="timeRangeLabel">{% if time_range == '6h' %}Last 6 Hours{% elif time_range == '24h' %}Last 24 Hours{% elif time_range == '7d' %}Last 7 Days{% else %}Last 1 Hour{% endif %}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" id="timeRangeMenu" aria-labelledby="timeRangeDropdownBtn">
+                        <li><a class="dropdown-item {% if not time_range or time_range == '1h' %}active{% endif %}" href="javascript:void(0)" data-range="1h"><i class="bi bi-clock me-2 text-muted"></i>Last 1 Hour</a></li>
+                        <li><a class="dropdown-item {% if time_range == '6h' %}active{% endif %}" href="javascript:void(0)" data-range="6h"><i class="bi bi-clock-history me-2 text-muted"></i>Last 6 Hours</a></li>
+                        <li><a class="dropdown-item {% if time_range == '24h' %}active{% endif %}" href="javascript:void(0)" data-range="24h"><i class="bi bi-calendar-event me-2 text-muted"></i>Last 24 Hours</a></li>
+                        <li><a class="dropdown-item {% if time_range == '7d' %}active{% endif %}" href="javascript:void(0)" data-range="7d"><i class="bi bi-calendar-range me-2 text-muted"></i>Last 7 Days</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-custom-body">
+                <div style="height: 260px; position: relative;">
+                    <canvas id="activityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Card: Risk Distribution -->
+    <div class="col-lg-5">
+        <div class="card card-custom-white h-100">
+            <div class="card-custom-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-shield-exclamation text-primary fs-5"></i>
+                    <h5 class="card-title-text mb-0">Risk Distribution</h5>
+                </div>
+                <!-- Host Scope Dropdown matching screenshot -->
+                <div class="dropdown" id="riskScopeDropdownContainer">
+                    <button class="btn btn-sm btn-filter-pill dropdown-toggle" type="button" id="riskScopeDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                        <span id="riskScopeLabel">{% if risk_scope == 'current' %}Current Host Only{% else %}All Hosts{% endif %}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" id="riskScopeMenu" aria-labelledby="riskScopeDropdownBtn">
+                        <li><a class="dropdown-item {% if not risk_scope or risk_scope == 'all' %}active{% endif %}" href="javascript:void(0)" data-scope="all">All Hosts</a></li>
+                        <li><a class="dropdown-item {% if risk_scope == 'current' %}active{% endif %}" href="javascript:void(0)" data-scope="current">Current Host Only</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-custom-body d-flex flex-column justify-content-between">
+                <!-- Donut Chart & Legend Row -->
+                <div class="row align-items-center my-auto py-2">
+                    <!-- Donut Chart with Centered Text -->
+                    <div class="col-6 position-relative text-center">
+                        <div style="height: 155px; position: relative;">
+                            <canvas id="riskChart"></canvas>
+                            <!-- Donut Center Label matching image -->
+                            <div class="donut-center-content">
+                                <div class="donut-big-num" id="donut-total-val">{{ stats.open_ports }}</div>
+                                <div class="donut-sub-text">Total Ports</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legend Breakdown matching screenshot -->
+                    <div class="col-6">
+                        <div class="risk-legend-list">
+                            <div class="d-flex align-items-center justify-content-between py-1 small">
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="legend-circle bg-success"></span>
+                                    <span class="text-secondary fw-medium">Low Risk</span>
+                                </span>
+                                <span class="fw-bold text-dark" id="dist-low-pct">{{ stats.risk_distribution.LOW_PCT }}%</span>
+                                <span class="text-secondary" id="dist-low-cnt">{{ stats.risk_distribution.LOW }}</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between py-1 small">
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="legend-circle bg-warning"></span>
+                                    <span class="text-secondary fw-medium">Medium Risk</span>
+                                </span>
+                                <span class="fw-bold text-dark" id="dist-med-pct">{{ stats.risk_distribution.MED_PCT }}%</span>
+                                <span class="text-secondary" id="dist-med-cnt">{{ stats.risk_distribution.MEDIUM }}</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between py-1 small">
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="legend-circle bg-danger"></span>
+                                    <span class="text-secondary fw-medium">High Risk</span>
+                                </span>
+                                <span class="fw-bold text-dark" id="dist-high-pct">{{ stats.risk_distribution.HIGH_PCT }}%</span>
+                                <span class="text-secondary" id="dist-high-cnt">{{ stats.risk_distribution.HIGH }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3 Bottom Metadata Columns matching screenshot -->
+                <div class="row g-2 border-top pt-3 mt-3 text-center align-items-center">
+                    <div class="col-4 border-end">
+                        <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+                            <div class="meta-icon-box"><i class="bi bi-clock text-primary"></i></div>
+                            <span class="meta-label">Last Scan</span>
+                        </div>
+                        <div class="meta-value-bold" id="stat-last-scan">{{ stats.last_scan }}</div>
+                        <div class="meta-sub-muted" id="stat-last-scan-sub">{{ stats.last_scan_sub }}</div>
+                    </div>
+
+                    <div class="col-4 border-end">
+                        <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+                            <div class="meta-icon-box"><i class="bi bi-hourglass-split text-primary"></i></div>
+                            <span class="meta-label">Next Scan</span>
+                        </div>
+                        <div class="meta-value-bold" id="stat-next-scan">{{ stats.next_scan }}</div>
+                        <div class="meta-sub-muted" id="stat-next-scan-sub">{{ stats.next_scan_sub }}</div>
+                    </div>
+
+                    <div class="col-4">
+                        <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+                            <div class="meta-icon-box"><i class="bi bi-gear text-primary"></i></div>
+                            <span class="meta-label">Scan Interval</span>
+                        </div>
+                        <div class="meta-value-bold">{{ stats.interval_seconds }} seconds</div>
+                        <div class="meta-sub-muted">Configured</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: Recent Port Events Table matching screenshot -->
+<div class="card card-custom-white">
+    <div class="card-custom-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-clock text-primary fs-5"></i>
+            <div>
+                <h5 class="card-title-text mb-0">Recent Port Events</h5>
+                <span class="card-subtitle-text">Latest port changes and security events</span>
+            </div>
+        </div>
+        <a href="{{ url_for('history.index', host_id=current_host.id) }}" class="btn-link-viewall">
+            View All History <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="card-custom-body p-0">
+        <div class="table-responsive">
+            <table class="table table-clean-events align-middle mb-0" id="recentEventsTable">
+                <thead>
+                    <tr>
+                        <th>TIME (UTC)</th>
+                        <th>HOST</th>
+                        <th>PORT / PROTO</th>
+                        <th>EVENT</th>
+                        <th>PROCESS</th>
+                        <th>RISK</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="recentEventsTbody">
+                    {% if not recent_events %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No monitoring events recorded yet. Click <strong>Scan Now</strong> or start monitoring.
+                        </td>
+                    </tr>
+                    {% else %}
+                        {% for event in recent_events %}
+                        <tr>
+                            <td class="col-time">{{ event.timestamp[11:19] if event.timestamp and event.timestamp|length > 18 else (event.timestamp or '07:48:12') }}</td>
+                            <td class="col-host">{{ current_host.ip_address }}</td>
+                            <td class="col-port">
+                                <strong>{{ event.port }}</strong> / {{ event.protocol }}
+                            </td>
+                            <td>
+                                {% if event.event_type == 'NEW_PORT' %}
+                                <span class="badge-pill-event event-new">NEW PORT</span>
+                                {% elif event.event_type == 'PORT_CLOSED' %}
+                                <span class="badge-pill-event event-closed">CLOSED</span>
+                                {% elif event.event_type == 'PROCESS_CHANGED' %}
+                                <span class="badge-pill-event event-change">PROC CHANGE</span>
+                                {% else %}
+                                <span class="badge-pill-event event-open">OPEN</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-process">{{ event.process_name or 'system' }}</td>
+                            <td>
+                                {% if event.risk_level == 'HIGH' %}
+                                <span class="badge-pill-risk risk-high">HIGH</span>
+                                {% elif event.risk_level == 'MEDIUM' %}
+                                <span class="badge-pill-risk risk-med">MEDIUM</span>
+                                {% else %}
+                                <span class="badge-pill-risk risk-low">LOW</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-action text-end">
+                                <div class="action-cell-wrapper justify-content-end">
+                                    <a href="{{ url_for('history.index', host_id=current_host.id, port=event.port) }}" class="action-link-view">
+                                        View
+                                    </a>
+                                    <div class="dropdown">
+                                        <button class="btn-history-menu dropdown-toggle no-chevron" type="button" data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false" title="More options">
+                                            <i class="bi bi-three-dots-vertical"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="font-size: 0.8rem; z-index: 1060; min-width: 185px;">
+                                            <li>
+                                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ url_for('history.index', host_id=current_host.id, port=event.port) }}">
+                                                    <i class="bi bi-funnel text-primary"></i> Filter in History
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{{ url_for('ports.index', host_id=current_host.id, search=event.port) }}">
+                                                    <i class="bi bi-search text-primary"></i> Inspect Port {{ event.port }}
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider my-1"></li>
+                                            <li>
+                                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ event.port }}/{{ event.protocol }}'); if (typeof showToast === 'function') { showToast('Copied {{ event.port }}/{{ event.protocol }} to clipboard', 'info'); }">
+                                                    <i class="bi bi-clipboard text-secondary"></i> Copy Port / Proto
+                                                </a>
+                                            </li>
+                                            {% if event.process_name %}
+                                            <li>
+                                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="navigator.clipboard.writeText('{{ event.process_name }}'); if (typeof showToast === 'function') { showToast('Copied {{ event.process_name }} to clipboard', 'info'); }">
+                                                    <i class="bi bi-terminal text-secondary"></i> Copy Process Name
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.initialTimeline = {{ (stats.timeline if stats else None) | tojson }};
+    window.initialRiskDist = {{ (stats.risk_distribution if stats else None) | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure all row action kebab dropdowns use fixed Popper strategy to prevent table-cell clipping
+    document.querySelectorAll('.btn-history-menu').forEach(function(btn) {
+        new bootstrap.Dropdown(btn, {
+            popperConfig: function(defaultBsPopperConfig) {
+                return Object.assign({}, defaultBsPopperConfig, {
+                    strategy: 'fixed'
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

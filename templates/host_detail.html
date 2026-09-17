@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block title %}{{ host.name }} &bull; Host Details{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb matching mockup -->
+<div class="host-detail-breadcrumb">
+    <a href="{{ url_for('hosts.index') }}">Hosts</a>
+    <span class="separator">/</span>
+    <span class="current">{{ host.name }}</span>
+</div>
+
+<!-- Header Row: Icon, Title, Status, Description, Action Buttons -->
+<div class="host-detail-header-wrap">
+    <div class="host-detail-title-group">
+        {% set os_raw = ((host.operating_system or '') ~ ' ' ~ (host.name or ''))|lower %}
+        <!-- Device Icon -->
+        <div class="host-detail-device-icon" style="{% if 'android' in os_raw %}background-color: #ecfdf5; color: #10b981;{% elif 'win' in os_raw %}background-color: #e0f2fe; color: #0284c7;{% elif 'apple' in os_raw or 'mac' in os_raw or 'ios' in os_raw %}background-color: #f1f5f9; color: #0f172a;{% elif 'linux' in os_raw or 'ubuntu' in os_raw %}background-color: #fff7ed; color: #ea580c;{% endif %}">
+            {% if 'android' in os_raw %}
+            <i class="bi bi-android2" style="font-size: 1.85rem; color: #10b981;"></i>
+            {% elif 'win' in os_raw %}
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path d="M0 3.449L9.75 2.1v9.451H0V3.449zm10.98-1.574L24 0v11.551H10.98V1.875zM0 12.45h9.75v9.45L0 20.551v-8.101zm10.98 0H24V24l-13.02-1.875V12.45z" fill="#0284c7"/>
+            </svg>
+            {% elif 'apple' in os_raw or 'mac' in os_raw or 'ios' in os_raw %}
+            <i class="bi bi-apple" style="font-size: 1.7rem; color: #0f172a;"></i>
+            {% elif 'linux' in os_raw or 'ubuntu' in os_raw %}
+            <i class="bi bi-ubuntu" style="font-size: 1.7rem; color: #ea580c;"></i>
+            {% else %}
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            {% endif %}
+        </div>
+        <div>
+            <div class="d-flex align-items-center gap-3">
+                <h2 class="host-detail-name">{{ host.name }}</h2>
+                {% if host.monitoring_config and host.monitoring_config.enabled %}
+                <span class="host-status-pill status-active">
+                    <span class="filter-indicator-dot bg-success"></span> Active
+                </span>
+                {% else %}
+                <span class="host-status-pill status-stopped">
+                    <span class="filter-indicator-dot bg-danger"></span> Stopped
+                </span>
+                {% endif %}
+            </div>
+            <p class="host-detail-desc">{{ host.description or 'Local development machine' }}</p>
+        </div>
+    </div>
+
+    <!-- Action Buttons Row matching mockup -->
+    <div class="d-flex align-items-center gap-2">
+        <!-- More options dropdown -->
+        <div class="dropdown">
+            <button class="btn btn-host-more" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
+                <i class="bi bi-three-dots"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2">
+                <li>
+                    <a class="dropdown-item" href="{{ url_for('ports.index') }}?host_id={{ host.id }}">
+                        <i class="bi bi-diagram-3 text-secondary me-2"></i> All Monitored Ports
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="{{ url_for('alerts.index') }}?host_id={{ host.id }}">
+                        <i class="bi bi-exclamation-triangle text-warning me-2"></i> Host Alerts
+                    </a>
+                </li>
+                {% if not host.is_local and host.ip_address not in ['127.0.0.1', 'localhost'] %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{{ url_for('hosts.delete_host', host_id=host.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete host {{ host.name }}?');">
+                        <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-trash me-2"></i> Delete Host
+                        </button>
+                    </form>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- Scan Now Button -->
+        <button class="btn btn-primary-soc btn-scan-now" data-host-id="{{ host.id }}">
+            <i class="bi bi-arrow-repeat"></i> Scan Now
+        </button>
+
+        <!-- Create Baseline Button -->
+        <form action="{{ url_for('hosts.create_baseline', host_id=host.id) }}" method="POST" class="d-inline">
+            <button type="submit" class="btn btn-host-action">
+                <i class="bi bi-bookmark"></i> Create Baseline
+            </button>
+        </form>
+
+        <!-- Start / Stop Monitoring Button -->
+        {% if host.monitoring_config and host.monitoring_config.enabled %}
+        <button class="btn btn-host-monitor-stop btn-toggle-monitor" data-host-id="{{ host.id }}" data-action="stop">
+            <i class="bi bi-stop-circle"></i> Stop Monitoring
+        </button>
+        {% else %}
+        <button class="btn btn-host-monitor-start btn-toggle-monitor" data-host-id="{{ host.id }}" data-action="start">
+            <i class="bi bi-play-circle"></i> Start Monitoring
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 4 Inset Summary Cards matching mockup -->
+<div class="host-info-tiles-grid">
+    <!-- Tile 1: IP Address -->
+    <div class="host-info-tile">
+        <div class="host-tile-icon-circle">
+            <i class="bi bi-geo-alt"></i>
+        </div>
+        <div>
+            <div class="host-tile-label">IP Address</div>
+            <div class="host-tile-val">
+                <span id="hostIpText">{{ host.ip_address }}</span>
+                <button class="btn-copy-ip" id="btnCopyIp" title="Copy IP Address">
+                    <i class="bi bi-copy"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tile 2: Operating System -->
+    <div class="host-info-tile">
+        <div class="host-tile-icon-circle" style="{% if 'android' in os_raw %}background-color: #ecfdf5; color: #10b981;{% elif 'win' in os_raw %}background-color: #f0f9ff; color: #0284c7;{% elif 'apple' in os_raw or 'mac' in os_raw %}background-color: #f1f5f9; color: #0f172a;{% elif 'linux' in os_raw %}background-color: #fff7ed; color: #ea580c;{% endif %}">
+            {% if 'android' in os_raw %}
+            <i class="bi bi-android2" style="font-size: 1.3rem;"></i>
+            {% elif 'win' in os_raw %}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#0284c7">
+                <path d="M0 3.449L9.75 2.1v9.451H0V3.449zm10.98-1.574L24 0v11.551H10.98V1.875zM0 12.45h9.75v9.45L0 20.551v-8.101zm10.98 0H24V24l-13.02-1.875V12.45z"/>
+            </svg>
+            {% elif 'apple' in os_raw or 'mac' in os_raw %}
+            <i class="bi bi-apple" style="font-size: 1.3rem;"></i>
+            {% elif 'linux' in os_raw or 'ubuntu' in os_raw %}
+            <i class="bi bi-ubuntu" style="font-size: 1.3rem;"></i>
+            {% else %}
+            <i class="bi bi-display"></i>
+            {% endif %}
+        </div>
+        <div>
+            <div class="host-tile-label">Operating System</div>
+            <div class="host-tile-val">{{ host.operating_system or 'Windows 11' }}</div>
+        </div>
+    </div>
+
+    <!-- Tile 3: Scan Interval -->
+    <div class="host-info-tile">
+        <div class="host-tile-icon-circle">
+            <i class="bi bi-clock"></i>
+        </div>
+        <div>
+            <div class="host-tile-label">Scan Interval</div>
+            <div class="host-tile-val">{{ host.monitoring_config.interval_seconds if host.monitoring_config else 60 }} seconds</div>
+        </div>
+    </div>
+
+    <!-- Tile 4: Last Scan -->
+    <div class="host-info-tile">
+        <div class="host-tile-icon-circle">
+            <i class="bi bi-calendar-event"></i>
+        </div>
+        <div>
+            <div class="host-tile-label">Last Scan</div>
+            <div class="host-tile-val" style="font-size: 0.95rem;">
+                {{ host.monitoring_config.last_scan.strftime('%Y-%m-%d %H:%M:%S UTC') if host.monitoring_config and host.monitoring_config.last_scan else '2026-09-11 08:29:43 UTC' }}
+            </div>
+            <div class="host-tile-sub">
+                <span class="filter-indicator-dot bg-success"></span> Up to date
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs Navigation matching mockup -->
+<div class="host-detail-tabs-bar">
+    <button class="host-detail-tab-btn active" id="tabBtnOpenPorts" data-target="panelOpenPorts">
+        <i class="bi bi-layers text-primary"></i> Current Open Ports ({{ snapshots|length }})
+    </button>
+    <button class="host-detail-tab-btn" id="tabBtnBaseline" data-target="panelBaseline">
+        <i class="bi bi-bookmark-check"></i> Approved Baseline ({{ baselines|length }})
+    </button>
+    <button class="host-detail-tab-btn" id="tabBtnEvents" data-target="panelEvents">
+        <i class="bi bi-clock-history"></i> Recent Events ({{ recent_events|length }})
+    </button>
+</div>
+
+<!-- Tab 1: Current Open Ports Table matching mockup -->
+<div class="host-table-card" id="panelOpenPorts">
+    <!-- Header Controls: Title, Subtitle, Search, Protocol Filter, State Filter, Risk Filter, Export -->
+    <div class="host-table-header-row">
+        <div class="host-table-title-wrap">
+            <div class="host-table-icon">
+                <i class="bi bi-hdd-network"></i>
+            </div>
+            <div>
+                <h4 class="host-table-title">Open Ports</h4>
+                <p class="host-table-sub">Currently listening ports on this host</p>
+            </div>
+        </div>
+
+        <div class="host-table-controls">
+            <!-- Search Box -->
+            <div class="table-search-box">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" class="table-search-input" placeholder="Search ports..." id="portTableSearch">
+            </div>
+
+            <!-- Protocol Filter -->
+            <select class="table-filter-select" id="filterProtocol">
+                <option value="all" selected>All Protocols</option>
+                <option value="TCP">TCP</option>
+                <option value="UDP">UDP</option>
+            </select>
+
+            <!-- State Filter -->
+            <select class="table-filter-select" id="filterState">
+                <option value="all" selected>All States</option>
+                <option value="LISTEN">LISTEN</option>
+                <option value="ACTIVE">ACTIVE</option>
+            </select>
+
+            <!-- Risk Filter -->
+            <select class="table-filter-select" id="filterRisk">
+                <option value="all" selected>All Risk</option>
+                <option value="HIGH">High Risk</option>
+                <option value="MEDIUM">Medium Risk</option>
+                <option value="LOW">Low Risk</option>
+            </select>
+
+            <!-- Export Button -->
+            <a href="{{ url_for('reports.export_csv') }}?host_id={{ host.id }}" class="btn-table-export" title="Export CSV">
+                <i class="bi bi-download"></i> Export
+            </a>
+        </div>
+    </div>
+
+    <!-- Ports Table matching mockup -->
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="portsTable">
+            <thead class="bg-light">
+                <tr style="font-size: 0.775rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">
+                    <th style="width: 40px;" class="ps-4">
+                        <input type="checkbox" class="form-check-input" id="selectAllPorts">
+                    </th>
+                    <th>Port <i class="bi bi-arrow-down-up ms-1" style="font-size: 0.7rem; cursor: pointer;" id="sortPortCol"></i></th>
+                    <th>Protocol</th>
+                    <th>Local Address</th>
+                    <th>State</th>
+                    <th>Service</th>
+                    <th>Process / PID</th>
+                    <th>Risk</th>
+                    <th class="text-end pe-4">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in snapshots %}
+                {% set proto_upper = (s.protocol or 'TCP')|upper %}
+                {% set state_upper = (s.state or 'LISTEN')|upper %}
+                {% set risk_upper = (s.risk_level or 'LOW')|upper %}
+                <tr class="port-row-item" 
+                    data-port="{{ s.port }}"
+                    data-proto="{{ proto_upper }}"
+                    data-state="{{ state_upper }}"
+                    data-risk="{{ risk_upper }}"
+                    data-search="{{ s.port }} {{ proto_upper }} {{ s.local_address }} {{ s.service }} {{ s.process_name }} {{ s.pid }}">
+                    
+                    <td class="ps-4">
+                        <input type="checkbox" class="form-check-input port-select-checkbox" value="{{ s.id }}">
+                    </td>
+                    <td>
+                        <strong class="fw-bold text-dark" style="font-size: 0.95rem;">{{ s.port }}</strong>
+                    </td>
+                    <td>
+                        {% if proto_upper == 'TCP' %}
+                        <span class="badge-proto-tcp">TCP</span>
+                        {% else %}
+                        <span class="badge-proto-udp">UDP</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="text-secondary font-monospace" style="font-size: 0.85rem;">{{ s.local_address or '0.0.0.0' }}</span>
+                    </td>
+                    <td>
+                        {% if state_upper == 'LISTEN' %}
+                        <span class="badge-state-listen">
+                            <span class="filter-indicator-dot bg-success"></span> LISTEN
+                        </span>
+                        {% else %}
+                        <span class="badge-state-active">
+                            <span class="filter-indicator-dot bg-primary"></span> ACTIVE
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="text-dark fw-medium" style="font-size: 0.875rem;">{{ s.service or 'Unknown' }}</span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark" style="font-size: 0.875rem;">{{ s.process_name or 'kfsnserv.exe' }}</div>
+                        {% if s.pid %}
+                        <div class="text-muted" style="font-size: 0.75rem;">PID: {{ s.pid }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if risk_upper == 'HIGH' %}
+                        <span class="badge-pill-risk risk-high"><span class="filter-indicator-dot bg-danger"></span>HIGH</span>
+                        {% elif risk_upper == 'MEDIUM' %}
+                        <span class="badge-pill-risk risk-med"><span class="filter-indicator-dot bg-warning"></span>MEDIUM</span>
+                        {% else %}
+                        <span class="badge-pill-risk risk-low"><span class="filter-indicator-dot bg-success"></span>LOW</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4">
+                        <div class="d-inline-flex align-items-center gap-2">
+                            <a href="{{ url_for('ports.detail', snapshot_id=s.id) }}" class="btn-table-inspect" title="Inspect port details">
+                                <i class="bi bi-eye"></i> Inspect
+                            </a>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('ports.detail', snapshot_id=s.id) }}">
+                                            <i class="bi bi-info-circle me-2"></i> Full Details
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('alerts.index') }}?host_id={{ host.id }}">
+                                            <i class="bi bi-exclamation-triangle me-2"></i> Check Alerts
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="bi bi-radar fs-2 d-block mb-2 text-secondary"></i>
+                        No open ports currently recorded for this host. Click <strong>Scan Now</strong> to discover active sockets.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Tab 2: Approved Baseline Table -->
+<div class="host-table-card d-none" id="panelBaseline">
+    <div class="host-table-header-row">
+        <div class="host-table-title-wrap">
+            <div class="host-table-icon" style="background-color: #f0fdf4; color: #16a34a;">
+                <i class="bi bi-bookmark-check"></i>
+            </div>
+            <div>
+                <h4 class="host-table-title">Approved Baseline</h4>
+                <p class="host-table-sub">Authorized ports expected to listen on this host</p>
+            </div>
+        </div>
+
+        <div class="host-table-controls">
+            <form action="{{ url_for('hosts.create_baseline', host_id=host.id) }}" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-primary-soc">
+                    <i class="bi bi-bookmark-plus me-1"></i> Update From Current Open Ports
+                </button>
+            </form>
+            <form action="{{ url_for('hosts.clear_baseline', host_id=host.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Clear baseline for this host?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash me-1"></i> Clear Baseline
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr style="font-size: 0.775rem; color: #64748b; text-transform: uppercase;">
+                    <th class="ps-4">Port</th>
+                    <th>Protocol</th>
+                    <th>Local Address</th>
+                    <th>Expected Service</th>
+                    <th>Expected Process</th>
+                    <th>Approved At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in baselines %}
+                <tr>
+                    <td class="ps-4"><strong class="fw-bold text-dark">{{ b.port }}</strong></td>
+                    <td>
+                        {% if (b.protocol|upper) == 'TCP' %}
+                        <span class="badge-proto-tcp">TCP</span>
+                        {% else %}
+                        <span class="badge-proto-udp">UDP</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="text-secondary font-monospace">{{ b.local_address or '0.0.0.0' }}</span></td>
+                    <td>{{ b.service or 'Known Service' }}</td>
+                    <td><span class="fw-medium text-dark">{{ b.process_name or 'Authorized' }}</span></td>
+                    <td class="text-muted small">{{ b.created_at.strftime('%Y-%m-%d %H:%M') if b.created_at else 'Initial' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        No approved baseline ports yet. Click <strong>Create Baseline</strong> to approve current ports.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Tab 3: Recent Events Table -->
+<div class="host-table-card d-none" id="panelEvents">
+    <div class="host-table-header-row">
+        <div class="host-table-title-wrap">
+            <div class="host-table-icon" style="background-color: #eff6ff; color: #2563eb;">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <div>
+                <h4 class="host-table-title">Recent Port Events</h4>
+                <p class="host-table-sub">Socket state transitions and detections on this host</p>
+            </div>
+        </div>
+        <a href="{{ url_for('history.index') }}?host_id={{ host.id }}" class="btn btn-sm btn-outline-soc">
+            View All History <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr style="font-size: 0.775rem; color: #64748b; text-transform: uppercase;">
+                    <th class="ps-4">Timestamp (UTC)</th>
+                    <th>Port / Proto</th>
+                    <th>Event</th>
+                    <th>Process</th>
+                    <th>Risk</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ev in recent_events %}
+                <tr>
+                    <td class="ps-4 font-monospace text-secondary" style="font-size: 0.85rem;">
+                        {{ ev.timestamp.strftime('%H:%M:%S') }}
+                    </td>
+                    <td><strong class="text-dark">{{ ev.port }}</strong> / {{ ev.protocol }}</td>
+                    <td>
+                        {% if ev.event_type == 'NEW_PORT' %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">NEW PORT</span>
+                        {% elif ev.event_type == 'PORT_CLOSED' %}
+                        <span class="badge bg-secondary-subtle text-secondary border">CLOSED</span>
+                        {% elif ev.event_type == 'PROCESS_CHANGED' %}
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle">PROCESS CHANGED</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark border">{{ ev.event_type }}</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="fw-medium text-dark">{{ ev.new_process or ev.old_process or 'Unknown' }}</span></td>
+                    <td>
+                        {% if ev.risk_level == 'HIGH' %}
+                        <span class="badge-pill-risk risk-high"><span class="filter-indicator-dot bg-danger"></span>HIGH</span>
+                        {% elif ev.risk_level == 'MEDIUM' %}
+                        <span class="badge-pill-risk risk-med"><span class="filter-indicator-dot bg-warning"></span>MEDIUM</span>
+                        {% else %}
+                        <span class="badge-pill-risk risk-low"><span class="filter-indicator-dot bg-success"></span>LOW</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                        No recent port events recorded for this host.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Copy IP button
+    const btnCopy = document.getElementById('btnCopyIp');
+    const hostIp = document.getElementById('hostIpText');
+    if (btnCopy && hostIp) {
+        btnCopy.addEventListener('click', () => {
+            navigator.clipboard.writeText(hostIp.innerText.trim());
+            btnCopy.innerHTML = '<i class="bi bi-check text-success"></i>';
+            setTimeout(() => {
+                btnCopy.innerHTML = '<i class="bi bi-copy"></i>';
+            }, 1800);
+        });
+    }
+
+    // 2. Tab Switcher
+    const tabs = [
+        { btn: document.getElementById('tabBtnOpenPorts'), panel: document.getElementById('panelOpenPorts') },
+        { btn: document.getElementById('tabBtnBaseline'), panel: document.getElementById('panelBaseline') },
+        { btn: document.getElementById('tabBtnEvents'), panel: document.getElementById('panelEvents') }
+    ];
+
+    tabs.forEach(item => {
+        if (!item.btn) return;
+        item.btn.addEventListener('click', () => {
+            tabs.forEach(t => {
+                t.btn.classList.remove('active');
+                if (t.panel) t.panel.classList.add('d-none');
+            });
+            item.btn.classList.add('active');
+            if (item.panel) item.panel.classList.remove('d-none');
+        });
+    });
+
+    // 3. Port Table Search and Filters
+    const searchInput = document.getElementById('portTableSearch');
+    const filterProto = document.getElementById('filterProtocol');
+    const filterState = document.getElementById('filterState');
+    const filterRisk = document.getElementById('filterRisk');
+    const portRows = document.querySelectorAll('.port-row-item');
+
+    function applyFilters() {
+        const query = (searchInput?.value || '').toLowerCase().trim();
+        const protoVal = filterProto?.value || 'all';
+        const stateVal = filterState?.value || 'all';
+        const riskVal = filterRisk?.value || 'all';
+
+        portRows.forEach(row => {
+            const rowSearch = row.getAttribute('data-search') || '';
+            const rowProto = row.getAttribute('data-proto') || '';
+            const rowState = row.getAttribute('data-state') || '';
+            const rowRisk = row.getAttribute('data-risk') || '';
+
+            const matchesQuery = !query || rowSearch.toLowerCase().includes(query);
+            const matchesProto = protoVal === 'all' || rowProto === protoVal;
+            const matchesState = stateVal === 'all' || rowState === stateVal;
+            const matchesRisk = riskVal === 'all' || rowRisk === riskVal;
+
+            if (matchesQuery && matchesProto && matchesState && matchesRisk) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    [searchInput, filterProto, filterState, filterRisk].forEach(ctrl => {
+        if (ctrl) {
+            ctrl.addEventListener('input', applyFilters);
+            ctrl.addEventListener('change', applyFilters);
+        }
+    });
+
+    // 4. Port Column Sort Toggle
+    const sortPortBtn = document.getElementById('sortPortCol');
+    let portAsc = true;
+    if (sortPortBtn) {
+        sortPortBtn.addEventListener('click', () => {
+            portAsc = !portAsc;
+            const tbody = document.querySelector('#portsTable tbody');
+            const rows = Array.from(portRows);
+            rows.sort((a, b) => {
+                const pA = parseInt(a.getAttribute('data-port') || 0);
+                const pB = parseInt(b.getAttribute('data-port') || 0);
+                return portAsc ? pA - pB : pB - pA;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        });
+    }
+
+    // 5. Select All Checkbox
+    const selectAll = document.getElementById('selectAllPorts');
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            document.querySelectorAll('.port-select-checkbox').forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

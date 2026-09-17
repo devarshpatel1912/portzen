@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login &bull; PortZen Console</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+    
+    <!-- Custom Login Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body class="login-body" id="bodyElement">
+
+    <div class="login-wrapper">
+        <!-- ============================================================== -->
+        <!-- LEFT PANEL: CYBERSECURITY BRANDING & VALUE PROPOSITIONS       -->
+        <!-- ============================================================== -->
+        <aside class="login-left-panel">
+            <div class="left-panel-content">
+                <!-- Glowing Cyber Mascot -->
+                <div class="brand-mascot-container">
+                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="PortZen Cyber Logo" class="brand-mascot-img">
+                </div>
+
+                <!-- Brand Title & Subtitle -->
+                <h1 class="brand-heading">Port<span class="cyan-accent">Zen</span></h1>
+                <p class="brand-subheading">Real-Time Port Monitoring &amp; Security Analysis</p>
+                <div class="brand-accent-line"></div>
+
+                <!-- 3 Key Value Propositions -->
+                <div class="left-features-list">
+                    <div class="left-feature-item">
+                        <div class="feature-glass-icon">
+                            <i class="bi bi-display"></i>
+                        </div>
+                        <div class="feature-item-body">
+                            <span class="feature-item-title">Monitor network exposure.</span>
+                            <p class="feature-item-desc">Get real-time visibility of open ports and services.</p>
+                        </div>
+                    </div>
+
+                    <div class="left-feature-item">
+                        <div class="feature-glass-icon">
+                            <i class="bi bi-shield-check"></i>
+                        </div>
+                        <div class="feature-item-body">
+                            <span class="feature-item-title">Detect unexpected ports.</span>
+                            <p class="feature-item-desc">Identify potential risks before attackers do.</p>
+                        </div>
+                    </div>
+
+                    <div class="left-feature-item">
+                        <div class="feature-glass-icon">
+                            <i class="bi bi-lock-fill"></i>
+                        </div>
+                        <div class="feature-item-body">
+                            <span class="feature-item-title">Stay secure.</span>
+                            <p class="feature-item-desc">Analyze, track and protect your infrastructure.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Left Footer -->
+            <div class="left-panel-footer">
+                &copy; 2026 PortZen &nbsp;|&nbsp; Secure Network Monitoring
+            </div>
+        </aside>
+
+        <!-- ============================================================== -->
+        <!-- RIGHT PANEL: SIGN IN CONSOLE CARD & QUICK STATS                -->
+        <!-- ============================================================== -->
+        <main class="login-right-panel">
+            <!-- Top Right Header: Theme Mode & Tagline -->
+            <div class="right-panel-header">
+                <button type="button" class="theme-mode-btn" id="themeToggleBtn" title="Toggle Light/Dark Theme" aria-label="Toggle theme">
+                    <i class="bi bi-moon-stars-fill" id="themeToggleIcon"></i>
+                </button>
+                <div class="header-tagline-box">
+                    <span class="tagline-top">Secure Today</span>
+                    <div class="tagline-underline"></div>
+                    <span class="tagline-bottom">Connected Tomorrow</span>
+                </div>
+            </div>
+
+            <!-- Centered Authentication Card -->
+            <div class="form-card-container">
+                <div class="auth-card">
+                    <div class="auth-card-header">
+                        <h2 class="auth-title">Welcome back</h2>
+                        <p class="auth-subtitle">Sign in to your PortZen console</p>
+                    </div>
+
+                    <!-- Flash Messages Notification -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                            <div style="padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 13.5px; display: flex; align-items: center; gap: 10px; {% if category == 'danger' or category == 'error' %}background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;{% elif category == 'success' %}background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;{% else %}background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af;{% endif %}">
+                                <i class="bi {% if category == 'danger' or category == 'error' %}bi-exclamation-circle-fill{% elif category == 'success' %}bi-check-circle-fill{% else %}bi-info-circle-fill{% endif %}"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <!-- Login Form -->
+                    <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}" id="loginForm">
+                        <!-- Username / Email Field -->
+                        <div class="form-group-item">
+                            <label for="username" class="form-label-custom">Username or Email</label>
+                            <div class="custom-input-group">
+                                <span class="input-icon-prefix"><i class="bi bi-person"></i></span>
+                                <input type="text" class="custom-input-field" id="username" name="username" placeholder="Enter username or email" required autofocus>
+                            </div>
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="form-group-item">
+                            <label for="password" class="form-label-custom">Password</label>
+                            <div class="custom-input-group">
+                                <span class="input-icon-prefix"><i class="bi bi-key"></i></span>
+                                <input type="password" class="custom-input-field" id="password" name="password" placeholder="Enter password" required>
+                                <button type="button" class="btn-toggle-eye" id="togglePassword" title="Show or hide password" aria-label="Toggle password visibility">
+                                    <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Form Options: Remember Me & Forgot Password -->
+                        <div class="form-options-row">
+                            <label class="custom-checkbox-label" for="rememberMe">
+                                <input type="checkbox" id="rememberMe" name="remember">
+                                <span>Remember me</span>
+                            </label>
+                            <a href="#" class="forgot-password-link" id="forgotPasswordLink">Forgot password?</a>
+                        </div>
+
+                        <!-- Primary Sign In Action -->
+                        <button type="submit" class="btn-primary-signin" id="loginSubmitBtn">
+                            <i class="bi bi-box-arrow-in-right"></i>
+                            <span>Sign In to Console</span>
+                        </button>
+
+                        <!-- OR Divider -->
+                        <div class="or-divider">
+                            <span>OR</span>
+                        </div>
+
+                        <!-- Social SSO: Continue with GitHub -->
+                        <button type="button" class="btn-github-sso" id="githubSsoBtn">
+                            <i class="bi bi-github" style="font-size: 18px;"></i>
+                            <span>Continue with GitHub</span>
+                        </button>
+
+                        <!-- Authorized Access Notice -->
+                        <div class="authorized-access-box">
+                            <i class="bi bi-shield-check authorized-shield-icon"></i>
+                            <div>
+                                <span class="authorized-access-title">Authorized access only</span>
+                                <span class="authorized-access-desc">PortZen protects your network visibility and monitoring data.</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Bottom Feature Badges -->
+            <div class="right-panel-footer">
+                <div class="footer-feature-pill">
+                    <div class="pill-icon-circle">
+                        <i class="bi bi-eye"></i>
+                    </div>
+                    <div class="pill-text-col">
+                        <span class="pill-title">Network Visibility</span>
+                        <span class="pill-desc">See what's exposed</span>
+                    </div>
+                </div>
+
+                <div class="footer-feature-pill">
+                    <div class="pill-icon-circle">
+                        <i class="bi bi-box"></i>
+                    </div>
+                    <div class="pill-text-col">
+                        <span class="pill-title">Port Monitoring</span>
+                        <span class="pill-desc">Track in real time</span>
+                    </div>
+                </div>
+
+                <div class="footer-feature-pill">
+                    <div class="pill-icon-circle">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <div class="pill-text-col">
+                        <span class="pill-title">Security Analysis</span>
+                        <span class="pill-desc">Stay one step ahead</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Client-side Interactive Scripts -->
+    <script>
+        // Password Visibility Toggle
+        const toggleBtn = document.getElementById('togglePassword');
+        const pwdInput = document.getElementById('password');
+        const pwdIcon = document.getElementById('togglePasswordIcon');
+
+        if (toggleBtn && pwdInput && pwdIcon) {
+            toggleBtn.addEventListener('click', () => {
+                const isPassword = pwdInput.type === 'password';
+                pwdInput.type = isPassword ? 'text' : 'password';
+                pwdIcon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+            });
+        }
+
+        // Submit Button State
+        const form = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('loginSubmitBtn');
+        if (form && submitBtn) {
+            form.addEventListener('submit', () => {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:8px;"></span> Authenticating...';
+            });
+        }
+
+        // Theme Toggle (Light / Dark)
+        const themeBtn = document.getElementById('themeToggleBtn');
+        const themeIcon = document.getElementById('themeToggleIcon');
+        const body = document.getElementById('bodyElement');
+
+        // Check saved theme or default to light
+        const savedTheme = localStorage.getItem('portzen_login_theme');
+        if (savedTheme === 'dark') {
+            body.classList.add('dark-theme');
+            themeIcon.className = 'bi bi-sun-fill';
+        }
+
+        if (themeBtn && themeIcon) {
+            themeBtn.addEventListener('click', () => {
+                const isDark = body.classList.toggle('dark-theme');
+                themeIcon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+                localStorage.setItem('portzen_login_theme', isDark ? 'dark' : 'light');
+            });
+        }
+
+        // Forgot Password notice
+        const forgotLink = document.getElementById('forgotPasswordLink');
+        if (forgotLink) {
+            forgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Contact your system administrator or check logs/portzen.log for default development credentials (admin / admin123).');
+            });
+        }
+
+        // GitHub SSO Notice
+        const githubBtn = document.getElementById('githubSsoBtn');
+        if (githubBtn) {
+            githubBtn.addEventListener('click', () => {
+                alert('GitHub OAuth SSO is available in enterprise multi-node deployment. Use your console credentials for local administrative access.');
+            });
+        }
+    </script>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>
