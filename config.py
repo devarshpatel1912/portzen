@@ -14,9 +14,10 @@ LOG_FILE = LOGS_DIR / "portzen.log"
 class Config:
     """Application base configuration."""
     SECRET_KEY = os.environ.get("SECRET_KEY", "portzen-dev-secret-key-cybersec-2026")
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", f"sqlite:///{BASE_DIR / 'portzen.db'}"
-    )
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URI = db_url or f"sqlite:///{BASE_DIR / 'portzen.db'}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Session security
