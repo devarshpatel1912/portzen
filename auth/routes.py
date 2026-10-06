@@ -56,6 +56,75 @@ def login():
     return render_template("login.html")
 
 
+@auth_bp.route("/signup", methods=["GET", "POST"])
+def signup():
+    if "user_id" in session:
+        return redirect(url_for("dashboard.index"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        # --- Validation ---
+        if not username or not email or not password or not confirm_password:
+            flash("All fields are required.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        if len(username) < 3 or len(username) > 64:
+            flash("Username must be between 3 and 64 characters.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        if "@" not in email or "." not in email.split("@")[-1]:
+            flash("Please enter a valid email address.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters long.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        if not any(c.isupper() for c in password) or not any(c.islower() for c in password) or not any(c.isdigit() for c in password):
+            flash("Password must contain at least one uppercase letter, one lowercase letter, and one digit.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        # Check for existing user
+        existing_user = User.query.filter(
+            (User.username == username) | (User.email == email)
+        ).first()
+
+        if existing_user:
+            if existing_user.username == username:
+                flash("Username is already taken.", "danger")
+            else:
+                flash("An account with this email already exists.", "danger")
+            return render_template("signup.html", username=username, email=email)
+
+        # Create new user
+        new_user = User(username=username, email=email)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+
+        logger.info(f"New user '{username}' registered from {request.remote_addr}")
+
+        # Auto-login the new user
+        session.clear()
+        session["user_id"] = new_user.id
+        session["username"] = new_user.username
+        session["email"] = new_user.email
+        session.permanent = True
+
+        flash(f"Welcome to PortZen, {new_user.username}! Your account has been created.", "success")
+        return redirect(url_for("dashboard.index"))
+
+    return render_template("signup.html")
+
+
 @auth_bp.route("/logout")
 def logout():
     username = session.get("username", "Unknown")

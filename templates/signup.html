@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login &bull; PortZen Console</title>
+    <title>Sign Up &bull; PortZen Console</title>
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +16,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
     
-    <!-- Custom Login Styles -->
+    <!-- Custom Login Styles (shared base) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
 <body class="login-body" id="bodyElement">
@@ -78,7 +78,7 @@
         </aside>
 
         <!-- ============================================================== -->
-        <!-- RIGHT PANEL: SIGN IN CONSOLE CARD & QUICK STATS                -->
+        <!-- RIGHT PANEL: SIGN UP CONSOLE CARD                             -->
         <!-- ============================================================== -->
         <main class="login-right-panel">
             <!-- Top Right Header: Theme Mode & Tagline -->
@@ -97,8 +97,8 @@
             <div class="form-card-container">
                 <div class="auth-card">
                     <div class="auth-card-header">
-                        <h2 class="auth-title">Welcome back</h2>
-                        <p class="auth-subtitle">Sign in to your PortZen console</p>
+                        <h2 class="auth-title">Create account</h2>
+                        <p class="auth-subtitle">Sign up for your PortZen console</p>
                     </div>
 
                     <!-- Flash Messages Notification -->
@@ -113,14 +113,23 @@
                         {% endif %}
                     {% endwith %}
 
-                    <!-- Login Form -->
-                    <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}" id="loginForm">
-                        <!-- Username / Email Field -->
+                    <!-- Signup Form -->
+                    <form method="POST" action="{{ url_for('auth.signup') }}" id="signupForm">
+                        <!-- Username Field -->
                         <div class="form-group-item">
-                            <label for="username" class="form-label-custom">Username or Email</label>
+                            <label for="username" class="form-label-custom">Username</label>
                             <div class="custom-input-group">
                                 <span class="input-icon-prefix"><i class="bi bi-person"></i></span>
-                                <input type="text" class="custom-input-field" id="username" name="username" placeholder="Enter username or email" required autofocus>
+                                <input type="text" class="custom-input-field" id="username" name="username" placeholder="Choose a username" value="{{ username | default('') }}" required autofocus minlength="3" maxlength="64">
+                            </div>
+                        </div>
+
+                        <!-- Email Field -->
+                        <div class="form-group-item">
+                            <label for="email" class="form-label-custom">Email</label>
+                            <div class="custom-input-group">
+                                <span class="input-icon-prefix"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="custom-input-field" id="email" name="email" placeholder="Enter your email" value="{{ email | default('') }}" required>
                             </div>
                         </div>
 
@@ -129,43 +138,51 @@
                             <label for="password" class="form-label-custom">Password</label>
                             <div class="custom-input-group">
                                 <span class="input-icon-prefix"><i class="bi bi-key"></i></span>
-                                <input type="password" class="custom-input-field" id="password" name="password" placeholder="Enter password" required>
+                                <input type="password" class="custom-input-field" id="password" name="password" placeholder="Create a password" required minlength="8">
                                 <button type="button" class="btn-toggle-eye" id="togglePassword" title="Show or hide password" aria-label="Toggle password visibility">
                                     <i class="bi bi-eye" id="togglePasswordIcon"></i>
                                 </button>
                             </div>
+                            <!-- Password Strength Indicator -->
+                            <div class="password-strength-bar-wrapper" id="passwordStrengthWrapper" style="display: none;">
+                                <div class="password-strength-track">
+                                    <div class="password-strength-fill" id="passwordStrengthFill"></div>
+                                </div>
+                                <span class="password-strength-label" id="passwordStrengthLabel">Weak</span>
+                            </div>
                         </div>
 
-                        <!-- Form Options: Remember Me & Forgot Password -->
-                        <div class="form-options-row">
-                            <label class="custom-checkbox-label" for="rememberMe">
-                                <input type="checkbox" id="rememberMe" name="remember">
-                                <span>Remember me</span>
-                            </label>
-                            <a href="#" class="forgot-password-link" id="forgotPasswordLink">Forgot password?</a>
+                        <!-- Confirm Password Field -->
+                        <div class="form-group-item">
+                            <label for="confirm_password" class="form-label-custom">Confirm Password</label>
+                            <div class="custom-input-group" id="confirmPasswordGroup">
+                                <span class="input-icon-prefix"><i class="bi bi-shield-lock"></i></span>
+                                <input type="password" class="custom-input-field" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
+                                <button type="button" class="btn-toggle-eye" id="toggleConfirmPassword" title="Show or hide password" aria-label="Toggle confirm password visibility">
+                                    <i class="bi bi-eye" id="toggleConfirmPasswordIcon"></i>
+                                </button>
+                            </div>
+                            <div class="password-match-hint" id="passwordMatchHint" style="display: none;"></div>
                         </div>
 
-                        <!-- Primary Sign In Action -->
-                        <button type="submit" class="btn-primary-signin" id="loginSubmitBtn">
-                            <i class="bi bi-box-arrow-in-right"></i>
-                            <span>Sign In to Console</span>
+                        <!-- Password Requirements -->
+                        <div class="password-requirements" id="passwordRequirements">
+                            <div class="req-item" id="reqLength"><i class="bi bi-circle"></i> At least 8 characters</div>
+                            <div class="req-item" id="reqUpper"><i class="bi bi-circle"></i> One uppercase letter</div>
+                            <div class="req-item" id="reqLower"><i class="bi bi-circle"></i> One lowercase letter</div>
+                            <div class="req-item" id="reqDigit"><i class="bi bi-circle"></i> One digit</div>
+                        </div>
+
+                        <!-- Primary Sign Up Action -->
+                        <button type="submit" class="btn-primary-signin" id="signupSubmitBtn" style="margin-top: 24px;">
+                            <i class="bi bi-person-plus"></i>
+                            <span>Create Account</span>
                         </button>
 
-                        <!-- OR Divider -->
-                        <div class="or-divider">
-                            <span>OR</span>
-                        </div>
-
-                        <!-- Social SSO: Continue with GitHub -->
-                        <button type="button" class="btn-github-sso" id="githubSsoBtn">
-                            <i class="bi bi-github" style="font-size: 18px;"></i>
-                            <span>Continue with GitHub</span>
-                        </button>
-
-                        <!-- Link to Sign Up -->
+                        <!-- Link to Login -->
                         <div class="signup-login-link-row">
-                            <span>Don't have an account?</span>
-                            <a href="{{ url_for('auth.signup') }}" class="signup-login-link">Sign up</a>
+                            <span>Already have an account?</span>
+                            <a href="{{ url_for('auth.login') }}" class="signup-login-link">Sign in</a>
                         </div>
 
                         <!-- Authorized Access Notice -->
@@ -217,7 +234,7 @@
 
     <!-- Client-side Interactive Scripts -->
     <script>
-        // Password Visibility Toggle
+        // Password Visibility Toggle (password)
         const toggleBtn = document.getElementById('togglePassword');
         const pwdInput = document.getElementById('password');
         const pwdIcon = document.getElementById('togglePasswordIcon');
@@ -230,13 +247,127 @@
             });
         }
 
+        // Password Visibility Toggle (confirm password)
+        const toggleConfirmBtn = document.getElementById('toggleConfirmPassword');
+        const confirmPwdInput = document.getElementById('confirm_password');
+        const confirmPwdIcon = document.getElementById('toggleConfirmPasswordIcon');
+
+        if (toggleConfirmBtn && confirmPwdInput && confirmPwdIcon) {
+            toggleConfirmBtn.addEventListener('click', () => {
+                const isPassword = confirmPwdInput.type === 'password';
+                confirmPwdInput.type = isPassword ? 'text' : 'password';
+                confirmPwdIcon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+            });
+        }
+
+        // Password Strength Meter
+        const strengthWrapper = document.getElementById('passwordStrengthWrapper');
+        const strengthFill = document.getElementById('passwordStrengthFill');
+        const strengthLabel = document.getElementById('passwordStrengthLabel');
+        const reqLength = document.getElementById('reqLength');
+        const reqUpper = document.getElementById('reqUpper');
+        const reqLower = document.getElementById('reqLower');
+        const reqDigit = document.getElementById('reqDigit');
+
+        function updateRequirement(el, met) {
+            const icon = el.querySelector('i');
+            if (met) {
+                el.classList.add('met');
+                el.classList.remove('unmet');
+                icon.className = 'bi bi-check-circle-fill';
+            } else {
+                el.classList.remove('met');
+                el.classList.add('unmet');
+                icon.className = 'bi bi-circle';
+            }
+        }
+
+        if (pwdInput) {
+            pwdInput.addEventListener('input', () => {
+                const val = pwdInput.value;
+                if (val.length === 0) {
+                    strengthWrapper.style.display = 'none';
+                    updateRequirement(reqLength, false);
+                    updateRequirement(reqUpper, false);
+                    updateRequirement(reqLower, false);
+                    updateRequirement(reqDigit, false);
+                    checkPasswordMatch();
+                    return;
+                }
+                strengthWrapper.style.display = 'flex';
+
+                const hasLength = val.length >= 8;
+                const hasUpper = /[A-Z]/.test(val);
+                const hasLower = /[a-z]/.test(val);
+                const hasDigit = /[0-9]/.test(val);
+                const hasSpecial = /[^A-Za-z0-9]/.test(val);
+
+                updateRequirement(reqLength, hasLength);
+                updateRequirement(reqUpper, hasUpper);
+                updateRequirement(reqLower, hasLower);
+                updateRequirement(reqDigit, hasDigit);
+
+                let score = 0;
+                if (hasLength) score++;
+                if (hasUpper) score++;
+                if (hasLower) score++;
+                if (hasDigit) score++;
+                if (hasSpecial) score++;
+                if (val.length >= 12) score++;
+
+                let pct, color, label;
+                if (score <= 2) { pct = 25; color = '#ef4444'; label = 'Weak'; }
+                else if (score <= 3) { pct = 50; color = '#f59e0b'; label = 'Fair'; }
+                else if (score <= 4) { pct = 75; color = '#22c55e'; label = 'Good'; }
+                else { pct = 100; color = '#00d2ff'; label = 'Strong'; }
+
+                strengthFill.style.width = pct + '%';
+                strengthFill.style.background = color;
+                strengthLabel.textContent = label;
+                strengthLabel.style.color = color;
+
+                checkPasswordMatch();
+            });
+        }
+
+        // Password Match Indicator
+        const matchHint = document.getElementById('passwordMatchHint');
+        const confirmGroup = document.getElementById('confirmPasswordGroup');
+
+        function checkPasswordMatch() {
+            if (!confirmPwdInput || !matchHint) return;
+            const confirmVal = confirmPwdInput.value;
+            const pwdVal = pwdInput.value;
+
+            if (confirmVal.length === 0) {
+                matchHint.style.display = 'none';
+                confirmGroup.style.borderColor = '';
+                return;
+            }
+
+            matchHint.style.display = 'block';
+            if (pwdVal === confirmVal) {
+                matchHint.innerHTML = '<i class="bi bi-check-circle-fill"></i> Passwords match';
+                matchHint.className = 'password-match-hint match-ok';
+                confirmGroup.style.borderColor = '#22c55e';
+            } else {
+                matchHint.innerHTML = '<i class="bi bi-x-circle-fill"></i> Passwords do not match';
+                matchHint.className = 'password-match-hint match-err';
+                confirmGroup.style.borderColor = '#ef4444';
+            }
+        }
+
+        if (confirmPwdInput) {
+            confirmPwdInput.addEventListener('input', checkPasswordMatch);
+        }
+
         // Submit Button State
-        const form = document.getElementById('loginForm');
-        const submitBtn = document.getElementById('loginSubmitBtn');
+        const form = document.getElementById('signupForm');
+        const submitBtn = document.getElementById('signupSubmitBtn');
         if (form && submitBtn) {
             form.addEventListener('submit', () => {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:8px;"></span> Authenticating...';
+                submitBtn.innerHTML = '<span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.6s linear infinite; margin-right:8px;"></span> Creating account...';
             });
         }
 
@@ -257,23 +388,6 @@
                 const isDark = body.classList.toggle('dark-theme');
                 themeIcon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
                 localStorage.setItem('portzen_login_theme', isDark ? 'dark' : 'light');
-            });
-        }
-
-        // Forgot Password notice
-        const forgotLink = document.getElementById('forgotPasswordLink');
-        if (forgotLink) {
-            forgotLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                alert('Contact your system administrator or check logs/portzen.log for default development credentials (admin / admin123).');
-            });
-        }
-
-        // GitHub SSO Notice
-        const githubBtn = document.getElementById('githubSsoBtn');
-        if (githubBtn) {
-            githubBtn.addEventListener('click', () => {
-                alert('GitHub OAuth SSO is available in enterprise multi-node deployment. Use your console credentials for local administrative access.');
             });
         }
     </script>

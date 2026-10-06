@@ -3,7 +3,7 @@ from flask import Flask, render_template, session
 from config import Config, logger
 from database import db
 from database.models import User, Alert, Host
-from auth.routes import auth_bp
+from auth import auth_bp
 from routes import (
     dashboard_bp,
     hosts_bp,
